@@ -125,7 +125,7 @@ fun LoginScreen(
             modifier = Modifier.authEntrance(started, 280)
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
         PrimaryButton(
             text = "Login",
@@ -133,11 +133,11 @@ fun LoginScreen(
             modifier = Modifier.authEntrance(started, 360)
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(10.dp))
 
         OrDivider(modifier = Modifier.authEntrance(started, 420))
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(10.dp))
 
         GoogleButton(
             text = "Login dengan Google",
@@ -145,7 +145,7 @@ fun LoginScreen(
             modifier = Modifier.authEntrance(started, 480)
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(4.dp))
 
         AuthSwitchText(
             question = "Belum punya akun?",

@@ -156,7 +156,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
         colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = TextDark),
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(52.dp)
     ) {
         Text(text = text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
@@ -174,7 +174,7 @@ fun GoogleButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
         ),
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(52.dp)
     ) {
         Image(
             painter = painterResource(id = R.drawable.ic_google),

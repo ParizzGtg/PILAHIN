@@ -206,7 +206,7 @@ fun RegisterScreen(
             modifier = Modifier.authEntrance(started, 430)
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
 
         PrimaryButton(
             text = "Daftar",
@@ -214,11 +214,11 @@ fun RegisterScreen(
             modifier = Modifier.authEntrance(started, 480)
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(10.dp))
 
         OrDivider(modifier = Modifier.authEntrance(started, 520))
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(10.dp))
 
         GoogleButton(
             text = "Daftar dengan Google",
@@ -226,7 +226,7 @@ fun RegisterScreen(
             modifier = Modifier.authEntrance(started, 560)
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(4.dp))
 
         AuthSwitchText(
             question = "Sudah punya akun?",
