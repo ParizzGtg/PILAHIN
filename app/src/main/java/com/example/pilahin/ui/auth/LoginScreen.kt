@@ -22,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -38,7 +37,7 @@ import com.example.pilahin.ui.theme.TextMuted
 
 @Composable
 fun LoginScreen(
-    onLogin: () -> Unit,
+    onLogin: (identifier: String) -> Unit,
     onGoogleLogin: () -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
@@ -60,7 +59,7 @@ fun LoginScreen(
         showErrors = true
         if (identifier.isNotBlank() && password.isNotBlank()) {
             focusManager.clearFocus()
-            onLogin()
+            onLogin(identifier.trim())
         }
     }
 
@@ -160,6 +159,10 @@ fun LoginScreen(
 @Composable
 private fun LoginScreenPreview() {
     PilahinTheme {
-        LoginScreen(onLogin = {}, onGoogleLogin = {}, onNavigateToRegister = {})
+        LoginScreen(
+            onLogin = { _ -> },
+            onGoogleLogin = {},
+            onNavigateToRegister = {}
+        )
     }
 }

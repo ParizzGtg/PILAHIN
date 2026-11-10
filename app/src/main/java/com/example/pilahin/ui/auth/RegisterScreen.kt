@@ -41,7 +41,7 @@ import com.example.pilahin.ui.theme.TextMuted
 
 @Composable
 fun RegisterScreen(
-    onRegister: () -> Unit,
+    onRegister: (email: String) -> Unit,
     onGoogleRegister: () -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
@@ -101,7 +101,7 @@ fun RegisterScreen(
                 confirmPassword == password
         if (valid) {
             focusManager.clearFocus()
-            onRegister()
+            onRegister(email)
         }
     }
 
@@ -241,6 +241,10 @@ fun RegisterScreen(
 @Composable
 private fun RegisterScreenPreview() {
     PilahinTheme {
-        RegisterScreen(onRegister = {}, onGoogleRegister = {}, onNavigateToLogin = {})
+        RegisterScreen(
+            onRegister = { _ -> },
+            onGoogleRegister = {},
+            onNavigateToLogin = {}
+        )
     }
 }
