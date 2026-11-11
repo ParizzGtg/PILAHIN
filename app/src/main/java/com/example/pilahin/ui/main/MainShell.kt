@@ -49,6 +49,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.pilahin.ui.common.pressScale
 import com.example.pilahin.ui.dashboard.DashboardScreen
+import com.example.pilahin.ui.dashboard.DashboardViewModel
+import com.example.pilahin.ui.dashboard.FullMapScreen
 import com.example.pilahin.ui.menu.AboutScreen
 import com.example.pilahin.ui.menu.GuideScreen
 import com.example.pilahin.ui.menu.HistoryScreen
@@ -74,6 +76,7 @@ object MainRoutes {
     const val OIL = "oil"
     const val RESULT = "result"
     const val ABOUT = "about"
+    const val MAP = "map"
 }
 
 @Composable
@@ -84,12 +87,13 @@ fun MainShell(
 ) {
     val nav = rememberNavController()
     val scanViewModel: ScanViewModel = viewModel()
+    val dashboardViewModel: DashboardViewModel = viewModel()
     val backEntry by nav.currentBackStackEntryAsState()
     val route = backEntry?.destination?.route
 
     // Sub-halaman ikut menyalakan tab induknya
     val activeTab = when (route) {
-        MainRoutes.GUIDE, MainRoutes.OIL -> MainRoutes.HOME
+        MainRoutes.GUIDE, MainRoutes.OIL, MainRoutes.MAP -> MainRoutes.HOME
         MainRoutes.ABOUT -> MainRoutes.PROFILE
         else -> route
     }
@@ -110,7 +114,6 @@ fun MainShell(
             navController = nav,
             startDestination = MainRoutes.HOME,
             modifier = Modifier.weight(1f),
-            // Setiap pindah halaman: naik dari bawah sambil memudar masuk
             enterTransition = { fadeIn(tween(200)) },
             exitTransition = { fadeOut(tween(120)) },
             popEnterTransition = { fadeIn(tween(200)) },
@@ -123,7 +126,15 @@ fun MainShell(
                     onSchedule = { openTab(MainRoutes.SCHEDULE) },
                     onGuide = { nav.navigate(MainRoutes.GUIDE) },
                     onHistory = { openTab(MainRoutes.HISTORY) },
-                    onOil = { nav.navigate(MainRoutes.OIL) }
+                    onOil = { nav.navigate(MainRoutes.OIL) },
+                    onOpenMap = { nav.navigate(MainRoutes.MAP) },
+                    viewModel = dashboardViewModel
+                )
+            }
+            composable(MainRoutes.MAP) {
+                FullMapScreen(
+                    viewModel = dashboardViewModel,
+                    onBack = { nav.popBackStack() }
                 )
             }
             composable(MainRoutes.SCHEDULE) {
@@ -175,7 +186,7 @@ fun MainShell(
             }
         }
 
-        if (route != MainRoutes.RESULT) {
+        if (route != MainRoutes.RESULT && route != MainRoutes.MAP) {
             MainBottomBar(
                 selected = activeTab,
                 onSelect = { openTab(it) }

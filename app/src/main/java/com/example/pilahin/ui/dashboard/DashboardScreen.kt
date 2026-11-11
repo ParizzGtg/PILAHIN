@@ -81,6 +81,7 @@ fun DashboardScreen(
     onGuide: () -> Unit,
     onHistory: () -> Unit,
     onOil: () -> Unit,
+    onOpenMap: () -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -139,7 +140,7 @@ fun DashboardScreen(
                 viewModel.onLocationChecking()
                 requestLocation()
             },
-            onOpenMap = { soon("Peta lengkap") },
+            onOpenMap = onOpenMap,
             modifier = Modifier.authEntrance(started, 240)
         )
 
@@ -185,7 +186,7 @@ fun DashboardScreen(
                 icon = Icons.Rounded.LocationOn,
                 title = "Peta Bank Sampah",
                 subtitle = "Temukan lokasi terdekat",
-                onClick = { soon("Peta bank sampah") },
+                onClick = onOpenMap,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -520,7 +521,7 @@ private fun MapCard(
                 }
             }
 
-            // Peta di dashboard hanya pratinjau, supaya tidak bentrok dengan scroll halaman.
+            // Peta di dashboard hanya pratinjau; ketuk untuk membuka peta layar penuh.
             if (state.locationStatus == LocationStatus.READY) {
                 Box(
                     modifier = Modifier
