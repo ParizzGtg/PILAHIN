@@ -41,7 +41,8 @@ private data class Creator(val name: String, val role: String)
 
 private val creators = listOf(
     Creator("Paris Septio", "Pengembang Aplikasi Android (Frontend)"),
-    Creator("Ferdi Seswanto", "Pengembang Aplikasi Android (Backend & AI)")
+    Creator("Ferdi Seswanto", "Pengembang Aplikasi Android (Backend & AI)"),
+    Creator("Salsa Bila", "Testing Aplikasi")
 )
 
 private const val CAMPUS = "Politeknik Negeri Ujung Pandang"
