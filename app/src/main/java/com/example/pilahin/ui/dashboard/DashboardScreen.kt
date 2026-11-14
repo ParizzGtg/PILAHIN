@@ -1,6 +1,5 @@
 package com.example.pilahin.ui.dashboard
 
-import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -52,7 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +74,8 @@ private val CardBorder = BorderStroke(1.dp, Color(0xFFE3EDD9))
 @Composable
 fun DashboardScreen(
     userName: String,
+    hasUnread: Boolean,
+    onNotifications: () -> Unit,
     onScan: () -> Unit,
     onSchedule: () -> Unit,
     onGuide: () -> Unit,
@@ -85,7 +85,6 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
 
     val requestLocation = rememberLocationRequester(
         onLocation = { lat, lon -> viewModel.onLocationReady(lat, lon) },
@@ -97,9 +96,6 @@ fun DashboardScreen(
         started = true
         requestLocation()
     }
-
-    fun soon(label: String) =
-        Toast.makeText(context, "$label segera hadir", Toast.LENGTH_SHORT).show()
 
     Column(
         modifier = Modifier
@@ -113,7 +109,8 @@ fun DashboardScreen(
 
         DashboardHeader(
             name = userName,
-            onBell = { soon("Notifikasi") },
+            hasUnread = hasUnread,
+            onBell = onNotifications,
             modifier = Modifier.authEntrance(started, 0)
         )
 
@@ -238,7 +235,12 @@ private fun greetingByTime(): String {
  * --------------------------------------------------------------- */
 
 @Composable
-private fun DashboardHeader(name: String, onBell: () -> Unit, modifier: Modifier = Modifier) {
+private fun DashboardHeader(
+    name: String,
+    hasUnread: Boolean,
+    onBell: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -268,14 +270,16 @@ private fun DashboardHeader(name: String, onBell: () -> Unit, modifier: Modifier
                 tint = GreenDark,
                 modifier = Modifier.size(24.dp)
             )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 10.dp, end = 11.dp)
-                    .size(9.dp)
-                    .clip(CircleShape)
-                    .background(GreenPrimary)
-            )
+            if (hasUnread) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 10.dp, end = 11.dp)
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(GreenPrimary)
+                )
+            }
         }
     }
 }

@@ -24,14 +24,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LocalShipping
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,11 +53,16 @@ import com.example.pilahin.ui.dashboard.DashboardScreen
 import com.example.pilahin.ui.dashboard.DashboardViewModel
 import com.example.pilahin.ui.dashboard.FullMapScreen
 import com.example.pilahin.ui.menu.AboutScreen
+import com.example.pilahin.ui.menu.EditProfileScreen
 import com.example.pilahin.ui.menu.GuideScreen
 import com.example.pilahin.ui.menu.HistoryScreen
 import com.example.pilahin.ui.menu.OilScreen
 import com.example.pilahin.ui.menu.ProfileScreen
-import com.example.pilahin.ui.menu.ScheduleScreen
+import com.example.pilahin.ui.menu.ProfileViewModel
+import com.example.pilahin.ui.pickup.NotificationsScreen
+import com.example.pilahin.ui.pickup.PickupFormScreen
+import com.example.pilahin.ui.pickup.PickupScreen
+import com.example.pilahin.ui.pickup.PickupViewModel
 import com.example.pilahin.ui.scan.ResultScreen
 import com.example.pilahin.ui.scan.ScanScreen
 import com.example.pilahin.ui.scan.ScanViewModel
@@ -68,10 +74,13 @@ import com.example.pilahin.ui.theme.TextMuted
 
 object MainRoutes {
     const val HOME = "home"
-    const val SCHEDULE = "schedule"
+    const val PICKUP = "pickup"
+    const val PICKUP_FORM = "pickup_form"
+    const val NOTIFICATIONS = "notifications"
     const val SCAN = "scan"
     const val HISTORY = "history"
     const val PROFILE = "profile"
+    const val EDIT_PROFILE = "edit_profile"
     const val GUIDE = "guide"
     const val OIL = "oil"
     const val RESULT = "result"
@@ -81,20 +90,24 @@ object MainRoutes {
 
 @Composable
 fun MainShell(
-    userName: String,
-    username: String,
     onLogout: () -> Unit
 ) {
     val nav = rememberNavController()
     val scanViewModel: ScanViewModel = viewModel()
     val dashboardViewModel: DashboardViewModel = viewModel()
+    val pickupViewModel: PickupViewModel = viewModel()
+    val profileViewModel: ProfileViewModel = viewModel()
+
+    val profile by profileViewModel.profile.collectAsState()
+    val notifications by pickupViewModel.notifications.collectAsState()
     val backEntry by nav.currentBackStackEntryAsState()
     val route = backEntry?.destination?.route
 
     // Sub-halaman ikut menyalakan tab induknya
     val activeTab = when (route) {
-        MainRoutes.GUIDE, MainRoutes.OIL, MainRoutes.MAP -> MainRoutes.HOME
-        MainRoutes.ABOUT -> MainRoutes.PROFILE
+        MainRoutes.GUIDE, MainRoutes.OIL, MainRoutes.MAP, MainRoutes.NOTIFICATIONS -> MainRoutes.HOME
+        MainRoutes.PICKUP_FORM -> MainRoutes.PICKUP
+        MainRoutes.ABOUT, MainRoutes.EDIT_PROFILE -> MainRoutes.PROFILE
         else -> route
     }
 
@@ -104,6 +117,11 @@ fun MainShell(
             launchSingleTop = true
         }
     }
+
+    val hideBottomBar = route == MainRoutes.RESULT ||
+            route == MainRoutes.MAP ||
+            route == MainRoutes.PICKUP_FORM ||
+            route == MainRoutes.EDIT_PROFILE
 
     Column(
         modifier = Modifier
@@ -121,9 +139,11 @@ fun MainShell(
         ) {
             composable(MainRoutes.HOME) {
                 DashboardScreen(
-                    userName = userName,
+                    userName = profile.name,
+                    hasUnread = notifications.any { !it.read },
+                    onNotifications = { nav.navigate(MainRoutes.NOTIFICATIONS) },
                     onScan = { openTab(MainRoutes.SCAN) },
-                    onSchedule = { openTab(MainRoutes.SCHEDULE) },
+                    onSchedule = { openTab(MainRoutes.PICKUP) },
                     onGuide = { nav.navigate(MainRoutes.GUIDE) },
                     onHistory = { openTab(MainRoutes.HISTORY) },
                     onOil = { nav.navigate(MainRoutes.OIL) },
@@ -137,8 +157,24 @@ fun MainShell(
                     onBack = { nav.popBackStack() }
                 )
             }
-            composable(MainRoutes.SCHEDULE) {
-                ScheduleScreen(onBack = { openTab(MainRoutes.HOME) })
+            composable(MainRoutes.PICKUP) {
+                PickupScreen(
+                    viewModel = pickupViewModel,
+                    onNewRequest = { nav.navigate(MainRoutes.PICKUP_FORM) }
+                )
+            }
+            composable(MainRoutes.PICKUP_FORM) {
+                PickupFormScreen(
+                    viewModel = pickupViewModel,
+                    onBack = { nav.popBackStack() },
+                    onSubmitted = { nav.popBackStack() }
+                )
+            }
+            composable(MainRoutes.NOTIFICATIONS) {
+                NotificationsScreen(
+                    viewModel = pickupViewModel,
+                    onBack = { nav.popBackStack() }
+                )
             }
             composable(MainRoutes.SCAN) {
                 ScanScreen(
@@ -150,7 +186,8 @@ fun MainShell(
                 ResultScreen(
                     viewModel = scanViewModel,
                     onBack = { nav.popBackStack() },
-                    onRescan = { openTab(MainRoutes.SCAN) }
+                    onRescan = { openTab(MainRoutes.SCAN) },
+                    onGuide = { nav.navigate(MainRoutes.GUIDE) }
                 )
             }
             composable(MainRoutes.HISTORY) {
@@ -165,11 +202,22 @@ fun MainShell(
             }
             composable(MainRoutes.PROFILE) {
                 ProfileScreen(
-                    name = userName,
-                    username = username,
+                    name = profile.name,
+                    username = profile.username,
+                    photoPath = profile.photoPath,
+                    onEditProfile = { nav.navigate(MainRoutes.EDIT_PROFILE) },
+                    onNotifications = { nav.navigate(MainRoutes.NOTIFICATIONS) },
                     onHistory = { openTab(MainRoutes.HISTORY) },
                     onAbout = { nav.navigate(MainRoutes.ABOUT) },
-                    onLogout = onLogout
+                    onLogout = onLogout,
+                    onDeleteAccount = { profileViewModel.deleteAccount { onLogout() } }
+                )
+            }
+            composable(MainRoutes.EDIT_PROFILE) {
+                EditProfileScreen(
+                    viewModel = profileViewModel,
+                    onBack = { nav.popBackStack() },
+                    onSaved = { nav.popBackStack() }
                 )
             }
             composable(MainRoutes.GUIDE) {
@@ -186,7 +234,7 @@ fun MainShell(
             }
         }
 
-        if (route != MainRoutes.RESULT && route != MainRoutes.MAP) {
+        if (!hideBottomBar) {
             MainBottomBar(
                 selected = activeTab,
                 onSelect = { openTab(it) }
@@ -234,7 +282,7 @@ private fun MainBottomBar(selected: String?, onSelect: (String) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             BarItem("Beranda", Icons.Rounded.Home, selected == MainRoutes.HOME, { onSelect(MainRoutes.HOME) }, Modifier.weight(1f))
-            BarItem("Jadwal", Icons.Rounded.CalendarMonth, selected == MainRoutes.SCHEDULE, { onSelect(MainRoutes.SCHEDULE) }, Modifier.weight(1f))
+            BarItem("Jemput", Icons.Rounded.LocalShipping, selected == MainRoutes.PICKUP, { onSelect(MainRoutes.PICKUP) }, Modifier.weight(1f))
             Spacer(Modifier.weight(1f))
             BarItem("Riwayat", Icons.Rounded.History, selected == MainRoutes.HISTORY, { onSelect(MainRoutes.HISTORY) }, Modifier.weight(1f))
             BarItem("Profil", Icons.Rounded.Person, selected == MainRoutes.PROFILE, { onSelect(MainRoutes.PROFILE) }, Modifier.weight(1f))

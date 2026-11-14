@@ -67,7 +67,7 @@ fun AppNavigation() {
 
     fun goHome(from: String, raw: String) {
         val name = nameFrom(raw)
-        session.login(name, "@" + name.lowercase())
+        session.login(name, name.lowercase(), if (raw.contains("@")) raw.trim() else "")
         goTo(Routes.HOME, from)
     }
 
@@ -148,11 +148,7 @@ fun AppNavigation() {
             }
 
             composable(Routes.HOME) {
-                MainShell(
-                    userName = session.name,
-                    username = session.username,
-                    onLogout = { logout() }
-                )
+                MainShell(onLogout = { logout() })
             }
         }
 
