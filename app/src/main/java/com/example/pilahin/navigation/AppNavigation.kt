@@ -10,10 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -22,8 +19,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.pilahin.data.SessionManager
 import com.example.pilahin.ui.auth.AuthViewModel
-import com.example.pilahin.ui.auth.GoogleAccountDialog
-import com.example.pilahin.ui.auth.GoogleAuthResult
+import com.example.pilahin.ui.auth.GoogleMode
+import com.example.pilahin.ui.auth.GoogleResult
 import com.example.pilahin.ui.auth.LoginScreen
 import com.example.pilahin.ui.auth.RegisterScreen
 import com.example.pilahin.ui.main.MainShell
@@ -39,22 +36,12 @@ object Routes {
     const val HOME = "home"
 }
 
-private enum class GoogleMode { LOGIN, REGISTER }
-
-private fun nameFrom(raw: String): String {
-    val base = raw.substringBefore("@").trim()
-    return if (base.isBlank() || base.all { it.isDigit() }) "Pengguna"
-    else base.replaceFirstChar { it.uppercase() }
-}
-
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     val context = LocalContext.current
     val authViewModel: AuthViewModel = viewModel()
     val session = remember { SessionManager(context) }
-
-    var googleMode by remember { mutableStateOf<GoogleMode?>(null) }
 
     fun toast(message: String) =
         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -65,14 +52,24 @@ fun AppNavigation() {
         }
     }
 
-    fun goHome(from: String, raw: String) {
-        val name = nameFrom(raw)
-        session.login(name, name.lowercase(), if (raw.contains("@")) raw.trim() else "")
-        goTo(Routes.HOME, from)
+    /** Pilih akun Google, lalu login/daftar ke server. */
+    fun google(mode: GoogleMode, from: String) {
+        authViewModel.google(context, mode) { result ->
+            when (result) {
+                GoogleResult.Success -> goTo(Routes.HOME, from)
+                GoogleResult.Cancelled -> Unit // pengguna menutup pemilih akun
+                is GoogleResult.NotRegistered -> {
+                    toast(result.message)
+                    if (from == Routes.LOGIN) goTo(Routes.REGISTER, Routes.LOGIN)
+                }
+                is GoogleResult.Error -> toast(result.message)
+            }
+        }
     }
 
     fun logout() {
         session.logout()
+        authViewModel.clearGoogleState()
         navController.navigate(Routes.LOGIN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
@@ -122,7 +119,7 @@ fun AppNavigation() {
                             else toast(error)
                         }
                     },
-                    onGoogleLogin = { googleMode = GoogleMode.LOGIN },
+                    onGoogleLogin = { google(GoogleMode.LOGIN, Routes.LOGIN) },
                     onNavigateToRegister = { goTo(Routes.REGISTER, Routes.LOGIN) },
                     isLoading = authViewModel.isLoading
                 )
@@ -144,7 +141,7 @@ fun AppNavigation() {
                             else toast(error)
                         }
                     },
-                    onGoogleRegister = { googleMode = GoogleMode.REGISTER },
+                    onGoogleRegister = { google(GoogleMode.REGISTER, Routes.REGISTER) },
                     onNavigateToLogin = { goTo(Routes.LOGIN, Routes.REGISTER) },
                     isLoading = authViewModel.isLoading
                 )
@@ -153,38 +150,6 @@ fun AppNavigation() {
             composable(Routes.HOME) {
                 MainShell(onLogout = { logout() })
             }
-        }
-
-        googleMode?.let { mode ->
-            GoogleAccountDialog(
-                title = if (mode == GoogleMode.LOGIN) "Login dengan Google"
-                else "Daftar dengan Google",
-                onDismiss = { googleMode = null },
-                onConfirm = { email ->
-                    googleMode = null
-                    when (mode) {
-                        GoogleMode.LOGIN -> authViewModel.googleLogin(email) { result ->
-                            when (result) {
-                                GoogleAuthResult.SUCCESS -> goHome(Routes.LOGIN, email)
-                                else -> {
-                                    toast("Akun belum terdaftar. Silakan daftar terlebih dahulu.")
-                                    goTo(Routes.REGISTER, Routes.LOGIN)
-                                }
-                            }
-                        }
-
-                        GoogleMode.REGISTER -> authViewModel.googleRegister(email) { result ->
-                            when (result) {
-                                GoogleAuthResult.SUCCESS -> goHome(Routes.REGISTER, email)
-                                else -> {
-                                    toast("Email sudah terdaftar. Silakan login.")
-                                    goTo(Routes.LOGIN, Routes.REGISTER)
-                                }
-                            }
-                        }
-                    }
-                }
-            )
         }
     }
 }

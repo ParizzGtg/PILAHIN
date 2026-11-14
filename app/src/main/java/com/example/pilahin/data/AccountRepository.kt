@@ -74,6 +74,22 @@ class AccountRepository(context: Context) {
         return Result.success(user)
     }
 
+    /**
+     * Login / daftar dengan Google. mode = "login" atau "register".
+     * Kalau mode "login" dan akun belum ada, hasilnya ApiException dengan code 404.
+     */
+    suspend fun googleAuth(idToken: String, mode: String): Result<ApiUser> {
+        val body = JSONObject()
+            .put("id_token", idToken)
+            .put("mode", mode)
+        val res = ApiClient.request("POST", "/api/google", body)
+        if (!res.isSuccess) return fail(res)
+
+        val user = parseUser(res.body.getJSONObject("user"))
+        session.saveLogin(res.body.getString("token"), user)
+        return Result.success(user)
+    }
+
     /** Upload foto profil (sudah dikompres jadi JPEG). Foto lama otomatis dihapus server. */
     suspend fun uploadPhoto(jpegBytes: ByteArray): Result<ApiUser> {
         val token = session.token ?: return notLoggedIn()

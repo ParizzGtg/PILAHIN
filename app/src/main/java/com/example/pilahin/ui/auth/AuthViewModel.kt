@@ -1,25 +1,31 @@
 package com.example.pilahin.ui.auth
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pilahin.data.AccountRepository
-import com.example.pilahin.data.AuthRepository
-import com.example.pilahin.data.FakeAuthRepository
+import com.example.pilahin.data.ApiException
+import com.example.pilahin.data.GoogleCancelledException
+import com.example.pilahin.data.GoogleSignIn
 import kotlinx.coroutines.launch
 
-enum class GoogleAuthResult { SUCCESS, NOT_REGISTERED, ALREADY_REGISTERED }
+enum class GoogleMode { LOGIN, REGISTER }
+
+sealed class GoogleResult {
+    object Success : GoogleResult()
+    object Cancelled : GoogleResult()                       // pengguna menutup pemilih akun
+    data class NotRegistered(val message: String) : GoogleResult()
+    data class Error(val message: String) : GoogleResult()
+}
 
 class AuthViewModel(app: Application) : AndroidViewModel(app) {
 
-    // Akun lewat backend Flask (register, login)
+    // Akun lewat backend Flask (register, login, Google)
     private val account = AccountRepository(app)
-
-    // SEMENTARA: login/daftar Google masih simulasi di HP, belum ke backend
-    private val repository: AuthRepository = FakeAuthRepository(app)
 
     /** true selama menunggu jawaban server, untuk tombol "Memproses..." */
     var isLoading by mutableStateOf(false)
@@ -59,22 +65,39 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun googleLogin(email: String, onResult: (GoogleAuthResult) -> Unit) {
+    /**
+     * Tampilkan pemilih akun Google, lalu kirim ID token ke server.
+     * activityContext: LocalContext.current dari layar (harus Activity).
+     */
+    fun google(activityContext: Context, mode: GoogleMode, onResult: (GoogleResult) -> Unit) {
+        if (isLoading) return
+        isLoading = true
         viewModelScope.launch {
-            val result = if (repository.isEmailRegistered(email))
-                GoogleAuthResult.SUCCESS else GoogleAuthResult.NOT_REGISTERED
+            val tokenResult = GoogleSignIn.getIdToken(activityContext)
+            val result = tokenResult.fold(
+                onSuccess = { idToken ->
+                    val modeText = if (mode == GoogleMode.REGISTER) "register" else "login"
+                    val auth = account.googleAuth(idToken, modeText)
+                    val error = auth.exceptionOrNull()
+                    when {
+                        error == null -> GoogleResult.Success
+                        error is ApiException && error.code == 404 ->
+                            GoogleResult.NotRegistered(error.message ?: "Akun belum terdaftar")
+                        else -> GoogleResult.Error(error.message ?: "Login Google gagal")
+                    }
+                },
+                onFailure = { error ->
+                    if (error is GoogleCancelledException) GoogleResult.Cancelled
+                    else GoogleResult.Error(error.message ?: "Login Google gagal")
+                }
+            )
+            isLoading = false
             onResult(result)
         }
     }
 
-    fun googleRegister(email: String, onResult: (GoogleAuthResult) -> Unit) {
-        viewModelScope.launch {
-            if (repository.isEmailRegistered(email)) {
-                onResult(GoogleAuthResult.ALREADY_REGISTERED)
-            } else {
-                repository.registerEmail(email)
-                onResult(GoogleAuthResult.SUCCESS)
-            }
-        }
+    /** Lupakan pilihan akun Google saat logout. */
+    fun clearGoogleState() {
+        viewModelScope.launch { GoogleSignIn.clearState(getApplication()) }
     }
 }
