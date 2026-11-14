@@ -52,7 +52,6 @@ import com.example.pilahin.ui.theme.GreenPrimary
 import com.example.pilahin.ui.theme.Lime
 import com.example.pilahin.ui.theme.TextDark
 import com.example.pilahin.ui.theme.TextMuted
-import java.io.File
 
 @Composable
 fun EditProfileScreen(
@@ -113,10 +112,21 @@ fun EditProfileScreen(
         if (!valid || saving) return
         saving = true
         focusManager.clearFocus()
-        viewModel.save(name, username, email, newPassword.ifEmpty { null }, stagedPhoto) {
-            Toast.makeText(context, "Profil berhasil diperbarui", Toast.LENGTH_SHORT).show()
-            onSaved()
-        }
+        viewModel.save(
+            name = name,
+            username = username,
+            email = email,
+            newPassword = newPassword.ifEmpty { null },
+            stagedPhoto = stagedPhoto,
+            onDone = {
+                Toast.makeText(context, "Profil berhasil diperbarui", Toast.LENGTH_SHORT).show()
+                onSaved()
+            },
+            onError = { message ->
+                saving = false
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        )
     }
 
     val shownPhoto = stagedPhoto ?: profile.photoPath
@@ -147,7 +157,7 @@ fun EditProfileScreen(
                 ) {
                     if (shownPhoto != null) {
                         AsyncImage(
-                            model = File(shownPhoto),
+                            model = photoModel(shownPhoto),
                             contentDescription = "Foto profil",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.size(110.dp)

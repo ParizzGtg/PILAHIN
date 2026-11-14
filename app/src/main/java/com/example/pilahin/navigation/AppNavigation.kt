@@ -116,9 +116,15 @@ fun AppNavigation() {
                 }
             ) {
                 LoginScreen(
-                    onLogin = { identifier -> goHome(Routes.LOGIN, identifier) },
+                    onLogin = { identifier, password ->
+                        authViewModel.login(identifier, password) { error ->
+                            if (error == null) goTo(Routes.HOME, Routes.LOGIN)
+                            else toast(error)
+                        }
+                    },
                     onGoogleLogin = { googleMode = GoogleMode.LOGIN },
-                    onNavigateToRegister = { goTo(Routes.REGISTER, Routes.LOGIN) }
+                    onNavigateToRegister = { goTo(Routes.REGISTER, Routes.LOGIN) },
+                    isLoading = authViewModel.isLoading
                 )
             }
 
@@ -132,18 +138,15 @@ fun AppNavigation() {
                 }
             ) {
                 RegisterScreen(
-                    onRegister = { email ->
-                        authViewModel.registerManual(email) { success ->
-                            if (success) {
-                                goHome(Routes.REGISTER, email)
-                            } else {
-                                toast("Email sudah terdaftar. Silakan login.")
-                                goTo(Routes.LOGIN, Routes.REGISTER)
-                            }
+                    onRegister = { username, fullName, email, phone, password ->
+                        authViewModel.register(username, fullName, email, phone, password) { error ->
+                            if (error == null) goTo(Routes.HOME, Routes.REGISTER)
+                            else toast(error)
                         }
                     },
                     onGoogleRegister = { googleMode = GoogleMode.REGISTER },
-                    onNavigateToLogin = { goTo(Routes.LOGIN, Routes.REGISTER) }
+                    onNavigateToLogin = { goTo(Routes.LOGIN, Routes.REGISTER) },
+                    isLoading = authViewModel.isLoading
                 )
             }
 

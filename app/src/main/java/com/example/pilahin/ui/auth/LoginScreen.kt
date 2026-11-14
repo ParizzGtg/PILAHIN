@@ -37,9 +37,10 @@ import com.example.pilahin.ui.theme.TextMuted
 
 @Composable
 fun LoginScreen(
-    onLogin: (identifier: String) -> Unit,
+    onLogin: (identifier: String, password: String) -> Unit,
     onGoogleLogin: () -> Unit,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit,
+    isLoading: Boolean = false
 ) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -57,9 +58,10 @@ fun LoginScreen(
 
     fun submit() {
         showErrors = true
+        if (isLoading) return
         if (identifier.isNotBlank() && password.isNotBlank()) {
             focusManager.clearFocus()
-            onLogin(identifier.trim())
+            onLogin(identifier.trim(), password)
         }
     }
 
@@ -127,7 +129,7 @@ fun LoginScreen(
         Spacer(Modifier.height(12.dp))
 
         PrimaryButton(
-            text = "Login",
+            text = if (isLoading) "Memproses..." else "Login",
             onClick = { submit() },
             modifier = Modifier.authEntrance(started, 360)
         )
@@ -160,7 +162,7 @@ fun LoginScreen(
 private fun LoginScreenPreview() {
     PilahinTheme {
         LoginScreen(
-            onLogin = { _ -> },
+            onLogin = { _, _ -> },
             onGoogleLogin = {},
             onNavigateToRegister = {}
         )

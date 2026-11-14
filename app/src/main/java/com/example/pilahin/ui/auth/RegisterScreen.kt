@@ -41,9 +41,16 @@ import com.example.pilahin.ui.theme.TextMuted
 
 @Composable
 fun RegisterScreen(
-    onRegister: (email: String) -> Unit,
+    onRegister: (
+        username: String,
+        fullName: String,
+        email: String,
+        phone: String,
+        password: String
+    ) -> Unit,
     onGoogleRegister: () -> Unit,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    isLoading: Boolean = false
 ) {
     var username by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
@@ -92,6 +99,7 @@ fun RegisterScreen(
     }
 
     fun submit() {
+        if (isLoading) return
         showErrors = true
         val valid = username.length >= 4 &&
                 fullName.isNotBlank() &&
@@ -101,7 +109,7 @@ fun RegisterScreen(
                 confirmPassword == password
         if (valid) {
             focusManager.clearFocus()
-            onRegister(email)
+            onRegister(username, fullName.trim(), email, phone, password)
         }
     }
 
@@ -209,7 +217,7 @@ fun RegisterScreen(
         Spacer(Modifier.height(8.dp))
 
         PrimaryButton(
-            text = "Daftar",
+            text = if (isLoading) "Memproses..." else "Daftar",
             onClick = { submit() },
             modifier = Modifier.authEntrance(started, 480)
         )
@@ -242,7 +250,7 @@ fun RegisterScreen(
 private fun RegisterScreenPreview() {
     PilahinTheme {
         RegisterScreen(
-            onRegister = { _ -> },
+            onRegister = { _, _, _, _, _ -> },
             onGoogleRegister = {},
             onNavigateToLogin = {}
         )

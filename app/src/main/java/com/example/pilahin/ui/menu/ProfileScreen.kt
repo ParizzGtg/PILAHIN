@@ -61,7 +61,6 @@ import com.example.pilahin.ui.theme.GreenPrimary
 import com.example.pilahin.ui.theme.Lime
 import com.example.pilahin.ui.theme.TextDark
 import com.example.pilahin.ui.theme.TextMuted
-import java.io.File
 
 private val Danger = Color(0xFFC62828)
 
@@ -107,7 +106,7 @@ fun ProfileScreen(
             ) {
                 if (photoPath != null) {
                     AsyncImage(
-                        model = File(photoPath),
+                        model = photoModel(photoPath),
                         contentDescription = "Foto profil",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(52.dp)

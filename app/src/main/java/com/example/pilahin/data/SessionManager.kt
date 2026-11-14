@@ -2,7 +2,7 @@ package com.example.pilahin.data
 
 import android.content.Context
 
-/** Menyimpan sesi dan profil di HP. Nanti bisa diganti token dan data dari backend. */
+/** Menyimpan sesi (token dari backend) dan profil di HP. */
 class SessionManager(context: Context) {
 
     private val prefs = context.applicationContext
@@ -14,6 +14,31 @@ class SessionManager(context: Context) {
         get() = (prefs.getString("username", "pengguna") ?: "pengguna").removePrefix("@")
     val email: String get() = prefs.getString("email", "") ?: ""
     val photoPath: String? get() = prefs.getString("photo", null)
+    val phone: String get() = prefs.getString("phone", "") ?: ""
+
+    /** Token login dari backend. null = belum login lewat server. */
+    val token: String? get() = prefs.getString("token", null)
+
+    /** Dipanggil setelah /api/login berhasil. */
+    fun saveLogin(token: String, user: ApiUser) {
+        prefs.edit()
+            .putBoolean("logged_in", true)
+            .putString("token", token)
+            .apply()
+        saveUser(user)
+    }
+
+    /** Simpan data akun terbaru dari server, termasuk alamat foto profil. */
+    fun saveUser(user: ApiUser) {
+        prefs.edit()
+            .putLong("user_id", user.id)
+            .putString("name", user.fullName)
+            .putString("username", user.username)
+            .putString("email", user.email)
+            .putString("phone", user.phone)
+            .putString("photo", user.photoUrl)
+            .apply()
+    }
 
     fun login(name: String, username: String, email: String = "") {
         prefs.edit()

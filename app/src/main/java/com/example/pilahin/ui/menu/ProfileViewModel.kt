@@ -2,11 +2,17 @@ package com.example.pilahin.ui.menu
 
 import android.app.Application
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pilahin.data.AccountRepository
 import com.example.pilahin.data.SessionManager
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +21,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Foto bisa berupa alamat server (http...) atau file di HP. Dipakai AsyncImage. */
+fun photoModel(photo: String): Any =
+    if (photo.startsWith("http")) photo else File(photo)
 
 data class UserProfile(
     val name: String,
@@ -25,8 +35,8 @@ data class UserProfile(
 
 class ProfileViewModel(private val app: Application) : AndroidViewModel(app) {
 
-    // Nanti ganti dengan implementasi backend asli
     private val session = SessionManager(app)
+    private val account = AccountRepository(app)
 
     private val _profile = MutableStateFlow(read())
     val profile: StateFlow<UserProfile> = _profile.asStateFlow()
@@ -55,9 +65,16 @@ class ProfileViewModel(private val app: Application) : AndroidViewModel(app) {
         email: String,
         newPassword: String?,
         stagedPhoto: String?,
-        onDone: () -> Unit
+        onDone: () -> Unit,
+        onError: (message: String) -> Unit
     ) {
         viewModelScope.launch {
+            if (session.token != null) {
+                saveToServer(name, username, email, newPassword, stagedPhoto, onDone, onError)
+                return@launch
+            }
+
+            // SEMENTARA: akun Google simulasi (tanpa token) tetap simpan di HP
             var photo = session.photoPath
             if (stagedPhoto != null) {
                 photo = withContext(Dispatchers.IO) {
@@ -76,12 +93,107 @@ class ProfileViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private suspend fun saveToServer(
+        name: String,
+        username: String,
+        email: String,
+        newPassword: String?,
+        stagedPhoto: String?,
+        onDone: () -> Unit,
+        onError: (message: String) -> Unit
+    ) {
+        // 1. Nama, username, email, password
+        val result = account.updateProfile(name.trim(), username.trim(), email.trim(), newPassword)
+        if (result.isFailure) {
+            onError(result.exceptionOrNull()?.message ?: "Gagal menyimpan profil")
+            return
+        }
+
+        // 2. Foto: kecilkan dulu, lalu upload. Server menghapus foto lama otomatis.
+        if (stagedPhoto != null) {
+            val oldLocalPhoto = session.photoPath?.takeIf { !it.startsWith("http") }
+            val bytes = withContext(Dispatchers.IO) {
+                runCatching { compressPhoto(stagedPhoto) }.getOrNull()
+            }
+            val upload = if (bytes != null) {
+                account.uploadPhoto(bytes)
+            } else {
+                Result.failure(Exception("Foto tidak bisa dibaca"))
+            }
+            if (upload.isFailure) {
+                _profile.value = read()
+                val reason = upload.exceptionOrNull()?.message ?: "coba lagi"
+                onError("Profil tersimpan, tapi foto gagal diunggah: $reason")
+                return
+            }
+            withContext(Dispatchers.IO) {
+                File(stagedPhoto).delete()
+                oldLocalPhoto?.let { File(it).delete() } // sisa foto lokal versi lama
+            }
+        }
+
+        _profile.value = read()
+        onDone()
+    }
+
     /**
-     * Hapus akun: bersihkan semua data lokal milik pengguna lalu akhiri sesi.
-     * Nanti tambahkan pemanggilan DELETE ke backend di sini.
+     * Ubah foto jadi JPEG persegi 512x512, kualitas 80 (sekitar 50-100 KB).
+     * Posisi foto diputar sesuai EXIF agar foto kamera tidak miring.
+     */
+    private fun compressPhoto(path: String, size: Int = 512): ByteArray {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Foto tidak bisa dibaca" }
+
+        // Baca versi yang sudah diperkecil agar hemat memori
+        var sample = 1
+        while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= size) sample *= 2
+        val decoded = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: throw IllegalArgumentException("Foto tidak bisa dibaca")
+
+        val rotation = runCatching {
+            when (ExifInterface(path).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL
+            )) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+        }.getOrDefault(0f)
+
+        // Potong tengah jadi persegi, kecilkan, lalu putar
+        val side = minOf(decoded.width, decoded.height)
+        val scale = if (side > size) size.toFloat() / side else 1f
+        val matrix = Matrix().apply {
+            postScale(scale, scale)
+            postRotate(rotation)
+        }
+        val square = Bitmap.createBitmap(
+            decoded, (decoded.width - side) / 2, (decoded.height - side) / 2, side, side, matrix, true
+        )
+
+        val out = ByteArrayOutputStream()
+        square.compress(Bitmap.CompressFormat.JPEG, 80, out)
+        if (square !== decoded) square.recycle()
+        decoded.recycle()
+        return out.toByteArray()
+    }
+
+    /**
+     * Hapus akun: hapus di server, lalu bersihkan semua data lokal dan akhiri sesi.
      */
     fun deleteAccount(onDone: () -> Unit) {
         viewModelScope.launch {
+            if (session.token != null) {
+                val result = account.deleteAccount()
+                if (result.isFailure) {
+                    val message = result.exceptionOrNull()?.message ?: "Gagal menghapus akun"
+                    Toast.makeText(app, message, Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+            }
+
             val email = session.email.trim().lowercase()
             withContext(Dispatchers.IO) {
                 listOf("pilahin_history", "pilahin_pickup", "pilahin_notifications").forEach {
