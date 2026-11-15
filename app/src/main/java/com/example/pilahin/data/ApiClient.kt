@@ -15,7 +15,7 @@ import org.json.JSONObject
 object ApiClient {
 
     // GANTI dengan IP VPS kamu (tanpa garis miring di akhir)
-    const val BASE_URL = "http://43.157.225.187:5000"
+    const val BASE_URL = "https://pilahin.sovereigns.my.id"
 
     class Response(val code: Int, val body: JSONObject) {
         val isSuccess: Boolean
