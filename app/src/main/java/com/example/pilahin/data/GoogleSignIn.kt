@@ -25,7 +25,7 @@ object GoogleSignIn {
     private const val TAG = "PilahinGoogle"
 
     // GANTI dengan WEB Client ID dari Google Cloud Console (bukan Android Client ID)
-    const val WEB_CLIENT_ID = "ISI_WEB_CLIENT_ID.apps.googleusercontent.com"
+    const val WEB_CLIENT_ID = "330157940711-aj3ha8hquvmr0qrov050scibsk9l6oq0.apps.googleusercontent.com"
 
     /** activityContext harus context Activity agar pemilih akun bisa tampil. */
     suspend fun getIdToken(activityContext: Context): Result<String> {
