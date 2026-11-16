@@ -1,6 +1,7 @@
 package com.example.pilahin.data
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -21,8 +22,10 @@ class GoogleCancelledException : Exception("Dibatalkan")
  */
 object GoogleSignIn {
 
+    private const val TAG = "PilahinGoogle"
+
     // GANTI dengan WEB Client ID dari Google Cloud Console (bukan Android Client ID)
-    const val WEB_CLIENT_ID = "330157940711-aj3ha8hquvmr0qrov050scibsk9l6oq0.apps.googleusercontent.com"
+    const val WEB_CLIENT_ID = "ISI_WEB_CLIENT_ID.apps.googleusercontent.com"
 
     /** activityContext harus context Activity agar pemilih akun bisa tampil. */
     suspend fun getIdToken(activityContext: Context): Result<String> {
@@ -43,12 +46,23 @@ object GoogleSignIn {
                 Result.failure(Exception("Jenis akun tidak didukung"))
             }
         } catch (e: GetCredentialCancellationException) {
-            Result.failure(GoogleCancelledException())
+            Log.w(TAG, "Dibatalkan: ${e.message}", e)
+            // Hanya diam kalau pengguna sendiri yang menutup pemilih akun.
+            // Error lain (mis. "[16] Account reauth failed" karena SHA-1 belum
+            // terdaftar) juga dilaporkan Google sebagai "dibatalkan".
+            if (e.message.orEmpty().contains("cancelled by the user", ignoreCase = true)) {
+                Result.failure(GoogleCancelledException())
+            } else {
+                Result.failure(Exception("Login Google gagal: ${e.message ?: "dibatalkan oleh sistem"}"))
+            }
         } catch (e: NoCredentialException) {
+            Log.w(TAG, "Tidak ada akun", e)
             Result.failure(Exception("Tidak ada akun Google di HP ini. Tambahkan akun di Pengaturan."))
         } catch (e: GetCredentialException) {
+            Log.e(TAG, "GetCredentialException type=${e.type}", e)
             Result.failure(Exception("Login Google gagal: ${e.message ?: e.type}"))
         } catch (e: GoogleIdTokenParsingException) {
+            Log.e(TAG, "Token tidak valid", e)
             Result.failure(Exception("Respon Google tidak valid"))
         }
     }
