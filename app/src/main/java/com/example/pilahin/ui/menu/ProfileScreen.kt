@@ -15,11 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
@@ -27,8 +25,6 @@ import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,7 +41,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,7 +50,6 @@ import com.example.pilahin.ui.common.Reveal
 import com.example.pilahin.ui.common.ScreenColumn
 import com.example.pilahin.ui.common.reveal
 import com.example.pilahin.ui.theme.ChipBg
-import com.example.pilahin.ui.theme.ChipBorder
 import com.example.pilahin.ui.theme.GreenDark
 import com.example.pilahin.ui.theme.GreenPrimary
 import com.example.pilahin.ui.theme.Lime
@@ -73,12 +67,10 @@ fun ProfileScreen(
     onNotifications: () -> Unit,
     onHistory: () -> Unit,
     onAbout: () -> Unit,
-    onLogout: () -> Unit,
-    onDeleteAccount: () -> Unit
+    onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
     fun soon(label: String) =
         Toast.makeText(context, "$label segera hadir", Toast.LENGTH_SHORT).show()
 
@@ -179,25 +171,8 @@ fun ProfileScreen(
             Text("Keluar", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Danger)
         }
 
-        Spacer(Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .reveal(5)
-                .clip(RoundedCornerShape(50))
-                .clickable { showDeleteDialog = true }
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Rounded.DeleteForever, null, tint = Danger, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Hapus Akun", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Danger)
-        }
-
-        Spacer(Modifier.height(6.dp))
-        Reveal(6) {
+        Spacer(Modifier.height(14.dp))
+        Reveal(5) {
             Text(
                 text = "Pilah sampah, hijaukan bumi",
                 fontSize = 11.sp,
@@ -223,63 +198,6 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("Batal", color = TextMuted)
-                }
-            }
-        )
-    }
-
-    if (showDeleteDialog) {
-        var confirmText by remember { mutableStateOf("") }
-        val canDelete = confirmText.trim() == "HAPUS"
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            containerColor = Color.White,
-            title = { Text("Hapus akun permanen?", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text(
-                        text = "Semua data akunmu akan dihapus dan tidak bisa dikembalikan: " +
-                                "profil, riwayat scan, request jemput, dan notifikasi.",
-                        color = TextMuted,
-                        fontSize = 13.sp
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text("Ketik HAPUS untuk melanjutkan.", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextDark)
-                    Spacer(Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = confirmText,
-                        onValueChange = { confirmText = it },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Danger,
-                            unfocusedBorderColor = ChipBorder,
-                            cursorColor = Danger,
-                            focusedTextColor = TextDark,
-                            unfocusedTextColor = TextDark
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = canDelete,
-                    onClick = {
-                        showDeleteDialog = false
-                        onDeleteAccount()
-                    }
-                ) {
-                    Text(
-                        "Hapus Akun",
-                        color = if (canDelete) Danger else TextMuted.copy(alpha = 0.4f),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Batal", color = TextMuted)
                 }
             }

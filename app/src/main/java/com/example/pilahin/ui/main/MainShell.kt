@@ -209,15 +209,15 @@ fun MainShell(
                     onNotifications = { nav.navigate(MainRoutes.NOTIFICATIONS) },
                     onHistory = { openTab(MainRoutes.HISTORY) },
                     onAbout = { nav.navigate(MainRoutes.ABOUT) },
-                    onLogout = onLogout,
-                    onDeleteAccount = { profileViewModel.deleteAccount { onLogout() } }
+                    onLogout = onLogout
                 )
             }
             composable(MainRoutes.EDIT_PROFILE) {
                 EditProfileScreen(
                     viewModel = profileViewModel,
                     onBack = { nav.popBackStack() },
-                    onSaved = { nav.popBackStack() }
+                    onSaved = { nav.popBackStack() },
+                    onDeleteAccount = { profileViewModel.deleteAccount { onLogout() } }
                 )
             }
             composable(MainRoutes.GUIDE) {

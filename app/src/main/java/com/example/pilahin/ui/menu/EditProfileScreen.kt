@@ -5,7 +5,9 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,14 +18,23 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,17 +58,21 @@ import com.example.pilahin.ui.auth.AuthTextField
 import com.example.pilahin.ui.auth.PrimaryButton
 import com.example.pilahin.ui.common.ScreenColumn
 import com.example.pilahin.ui.common.reveal
+import com.example.pilahin.ui.theme.ChipBorder
 import com.example.pilahin.ui.theme.GreenDark
 import com.example.pilahin.ui.theme.GreenPrimary
 import com.example.pilahin.ui.theme.Lime
 import com.example.pilahin.ui.theme.TextDark
 import com.example.pilahin.ui.theme.TextMuted
 
+private val Danger = Color(0xFFC62828)
+
 @Composable
 fun EditProfileScreen(
     viewModel: ProfileViewModel,
     onBack: () -> Unit,
-    onSaved: () -> Unit
+    onSaved: () -> Unit,
+    onDeleteAccount: () -> Unit
 ) {
     val profile by viewModel.profile.collectAsState()
     val context = LocalContext.current
@@ -71,6 +86,7 @@ fun EditProfileScreen(
     var stagedPhoto by remember { mutableStateOf<String?>(null) }
     var showErrors by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -250,8 +266,105 @@ fun EditProfileScreen(
 
         Spacer(Modifier.height(12.dp))
         Box(modifier = Modifier.reveal(7)) {
-            PrimaryButton(text = "Simpan Perubahan", onClick = { submit() })
+            PrimaryButton(
+                text = if (saving) "Menyimpan..." else "Simpan Perubahan",
+                onClick = { submit() }
+            )
         }
-        Spacer(Modifier.imePadding().height(24.dp))
+
+        // ===== Hapus akun: terpisah di bagian paling bawah =====
+        Spacer(Modifier.height(36.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .reveal(8)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White)
+                .border(1.dp, Danger.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                .padding(16.dp)
+        ) {
+            Text("Hapus akun", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Menghapus akun akan menghilangkan profil, riwayat scan, dan request jemput secara permanen. Tindakan ini tidak dapat dibatalkan.",
+                fontSize = 12.sp,
+                color = TextMuted,
+                lineHeight = 17.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { showDeleteDialog = true },
+                shape = RoundedCornerShape(50),
+                border = BorderStroke(1.dp, Danger),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Danger),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Rounded.DeleteForever, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text("Hapus akun saya", fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Spacer(Modifier.imePadding().height(28.dp))
+    }
+
+    if (showDeleteDialog) {
+        var confirmText by remember { mutableStateOf("") }
+        val canDelete = confirmText.trim() == "HAPUS"
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor = Color.White,
+            title = { Text("Hapus akun permanen?", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        text = "Semua data akunmu akan dihapus dan tidak bisa dikembalikan.",
+                        color = TextMuted,
+                        fontSize = 13.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Ketik HAPUS untuk melanjutkan.",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextDark
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = confirmText,
+                        onValueChange = { confirmText = it },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Danger,
+                            unfocusedBorderColor = ChipBorder,
+                            cursorColor = Danger,
+                            focusedTextColor = TextDark,
+                            unfocusedTextColor = TextDark
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = canDelete,
+                    onClick = {
+                        showDeleteDialog = false
+                        onDeleteAccount()
+                    }
+                ) {
+                    Text(
+                        "Hapus Akun",
+                        color = if (canDelete) Danger else TextMuted.copy(alpha = 0.4f),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Batal", color = TextMuted)
+                }
+            }
+        )
     }
 }

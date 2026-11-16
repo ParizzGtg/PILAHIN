@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId = "com.example.pilahin"
         minSdk = 24
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -28,7 +28,7 @@ android {
     }
 
     buildFeatures {
-        compose = true   // <- tambahan
+        compose = true
     }
 
     compileOptions {

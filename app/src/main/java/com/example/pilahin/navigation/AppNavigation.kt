@@ -91,15 +91,22 @@ fun AppNavigation() {
             composable(Routes.SPLASH) {
                 SplashScreen(
                     onSplashFinished = {
-                        if (session.isLoggedIn) goTo(Routes.HOME, Routes.SPLASH)
-                        else goTo(Routes.ONBOARDING, Routes.SPLASH)
+                        if (session.isLoggedIn) session.markOnboardingSeen()
+                        when {
+                            session.isLoggedIn -> goTo(Routes.HOME, Routes.SPLASH)
+                            session.onboardingSeen -> goTo(Routes.LOGIN, Routes.SPLASH)
+                            else -> goTo(Routes.ONBOARDING, Routes.SPLASH)
+                        }
                     }
                 )
             }
 
             composable(Routes.ONBOARDING) {
                 OnboardingScreen(
-                    onFinished = { goTo(Routes.LOGIN, Routes.ONBOARDING) }
+                    onFinished = {
+                        session.markOnboardingSeen()
+                        goTo(Routes.LOGIN, Routes.ONBOARDING)
+                    }
                 )
             }
 

@@ -8,6 +8,16 @@ class SessionManager(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences("pilahin_session", Context.MODE_PRIVATE)
 
+    // Terpisah dari sesi login, jadi tidak ikut terhapus saat logout / hapus akun
+    private val appPrefs = context.applicationContext
+        .getSharedPreferences("pilahin_app", Context.MODE_PRIVATE)
+
+    val onboardingSeen: Boolean get() = appPrefs.getBoolean("onboarding_seen", false)
+
+    fun markOnboardingSeen() {
+        appPrefs.edit().putBoolean("onboarding_seen", true).apply()
+    }
+
     val isLoggedIn: Boolean get() = prefs.getBoolean("logged_in", false)
     val name: String get() = prefs.getString("name", "Pengguna") ?: "Pengguna"
     val username: String
@@ -21,6 +31,7 @@ class SessionManager(context: Context) {
 
     /** Dipanggil setelah /api/login berhasil. */
     fun saveLogin(token: String, user: ApiUser) {
+        markOnboardingSeen() // yang sudah login pasti sudah melewati onboarding
         prefs.edit()
             .putBoolean("logged_in", true)
             .putString("token", token)
@@ -41,6 +52,7 @@ class SessionManager(context: Context) {
     }
 
     fun login(name: String, username: String, email: String = "") {
+        markOnboardingSeen()
         prefs.edit()
             .putBoolean("logged_in", true)
             .putString("name", name)
@@ -63,7 +75,9 @@ class SessionManager(context: Context) {
         prefs.edit().putString("password_hash", hash).apply()
     }
 
+    /** Hapus sesi login saja. Penanda onboarding tetap tersimpan. */
     fun logout() {
+        markOnboardingSeen() // jaga-jaga untuk sesi yang dibuat sebelum update
         prefs.edit().clear().apply()
     }
 }
