@@ -1,6 +1,5 @@
 package com.example.pilahin.ui.menu
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,10 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -29,9 +28,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,19 +43,25 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.pilahin.ui.common.CardBorderStroke
 import com.example.pilahin.ui.common.Reveal
 import com.example.pilahin.ui.common.ScreenColumn
+import com.example.pilahin.ui.common.fetchAddressText
+import com.example.pilahin.ui.common.loadSavedAddress
 import com.example.pilahin.ui.common.reveal
+import com.example.pilahin.ui.common.saveAddress
+import com.example.pilahin.ui.dashboard.rememberLocationRequester
 import com.example.pilahin.ui.theme.ChipBg
 import com.example.pilahin.ui.theme.GreenDark
 import com.example.pilahin.ui.theme.GreenPrimary
 import com.example.pilahin.ui.theme.Lime
 import com.example.pilahin.ui.theme.TextDark
 import com.example.pilahin.ui.theme.TextMuted
+import kotlinx.coroutines.launch
 
 private val Danger = Color(0xFFC62828)
 
@@ -66,13 +73,37 @@ fun ProfileScreen(
     onEditProfile: () -> Unit,
     onNotifications: () -> Unit,
     onHistory: () -> Unit,
+    onTutorial: () -> Unit,
     onAbout: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showLogoutDialog by remember { mutableStateOf(false) }
-    fun soon(label: String) =
-        Toast.makeText(context, "$label segera hadir", Toast.LENGTH_SHORT).show()
+
+    // Alamat pengangkutan otomatis dari GPS
+    var address by remember { mutableStateOf(loadSavedAddress(context)) }
+    var locating by remember { mutableStateOf(true) }
+
+    val requestLocation = rememberLocationRequester(
+        onLocation = { lat, lon ->
+            scope.launch {
+                val text = fetchAddressText(context, lat, lon)
+                address = text
+                saveAddress(context, text)
+                locating = false
+            }
+        },
+        onNeedsAction = { locating = false }
+    )
+    LaunchedEffect(Unit) { requestLocation() }
+
+    val addressSubtitle = when {
+        locating && address == null -> "Mencari lokasi Anda…"
+        locating -> address
+        address != null -> address
+        else -> "Ketuk untuk mengaktifkan GPS"
+    }
 
     ScreenColumn(title = "Profil", onBack = null) {
         Reveal(0) {
@@ -135,7 +166,16 @@ fun ProfileScreen(
             Column {
                 SectionTitle("AKTIVITAS & JADWAL")
                 MenuGroup {
-                    MenuRow(Icons.Rounded.LocationOn, "Alamat Pengangkutan", "Melati RT 03") { soon("Alamat pengangkutan") }
+                    MenuRow(
+                        icon = Icons.Rounded.LocationOn,
+                        title = "Alamat Pengangkutan",
+                        subtitle = addressSubtitle,
+                        subtitleLines = 3,
+                        onClick = {
+                            locating = true
+                            requestLocation()
+                        }
+                    )
                     MenuRow(Icons.Rounded.Notifications, "Notifikasi", "Lihat pemberitahuan", onClick = onNotifications)
                     MenuRow(Icons.Rounded.History, "Riwayat Pemilahan", null, onClick = onHistory)
                 }
@@ -147,7 +187,7 @@ fun ProfileScreen(
             Column {
                 SectionTitle("DUKUNGAN")
                 MenuGroup {
-                    MenuRow(Icons.Rounded.Help, "Bantuan", null) { soon("Bantuan") }
+                    MenuRow(Icons.Rounded.MenuBook, "Tutorial Penggunaan", "Cara memakai aplikasi", onClick = onTutorial)
                     MenuRow(Icons.Rounded.Info, "Info Aplikasi", "Deskripsi dan pencipta", onClick = onAbout)
                 }
             }
@@ -235,6 +275,7 @@ private fun MenuRow(
     icon: ImageVector,
     title: String,
     subtitle: String?,
+    subtitleLines: Int = 1,
     onClick: () -> Unit
 ) {
     Row(
@@ -256,7 +297,15 @@ private fun MenuRow(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextDark)
-            if (subtitle != null) Text(subtitle, fontSize = 11.sp, color = TextMuted)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = TextMuted,
+                    maxLines = subtitleLines,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         Icon(Icons.Rounded.ChevronRight, null, tint = TextMuted)
     }

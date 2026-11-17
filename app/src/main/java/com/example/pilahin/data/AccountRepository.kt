@@ -77,6 +77,7 @@ class AccountRepository(context: Context) {
     /**
      * Login / daftar dengan Google. mode = "login" atau "register".
      * Kalau mode "login" dan akun belum ada, hasilnya ApiException dengan code 404.
+     * Sesi hanya dibuat saat login; daftar tidak langsung masuk.
      */
     suspend fun googleAuth(idToken: String, mode: String): Result<ApiUser> {
         val body = JSONObject()
@@ -86,7 +87,9 @@ class AccountRepository(context: Context) {
         if (!res.isSuccess) return fail(res)
 
         val user = parseUser(res.body.getJSONObject("user"))
-        session.saveLogin(res.body.getString("token"), user)
+        if (mode == "login") {
+            session.saveLogin(res.body.getString("token"), user)
+        }
         return Result.success(user)
     }
 

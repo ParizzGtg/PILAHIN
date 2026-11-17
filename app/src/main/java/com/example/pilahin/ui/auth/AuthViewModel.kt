@@ -15,11 +15,22 @@ import kotlinx.coroutines.launch
 
 enum class GoogleMode { LOGIN, REGISTER }
 
-sealed class GoogleResult {
-    object Success : GoogleResult()
-    object Cancelled : GoogleResult()                       // pengguna menutup pemilih akun
-    data class NotRegistered(val message: String) : GoogleResult()
-    data class Error(val message: String) : GoogleResult()
+sealed class AuthResult {
+    object Success : AuthResult()
+    object Cancelled : AuthResult()                         // pengguna menutup pemilih akun
+    data class NotRegistered(val message: String) : AuthResult()
+    data class AlreadyRegistered(val message: String) : AuthResult()
+    data class Error(val message: String) : AuthResult()
+}
+
+private fun Throwable.toAuthResult(): AuthResult = when {
+    this is GoogleCancelledException -> AuthResult.Cancelled
+    this is ApiException && code == 404 ->
+        AuthResult.NotRegistered(message ?: "Akun belum terdaftar")
+    this is ApiException &&
+            (code == 409 || message.orEmpty().contains("sudah terdaftar", ignoreCase = true)) ->
+        AuthResult.AlreadyRegistered(message ?: "Akun sudah terdaftar")
+    else -> AuthResult.Error(message ?: "Terjadi kesalahan")
 }
 
 class AuthViewModel(app: Application) : AndroidViewModel(app) {
@@ -31,37 +42,31 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     var isLoading by mutableStateOf(false)
         private set
 
-    /** onResult(null) = berhasil, onResult("pesan") = gagal */
-    fun login(identifier: String, password: String, onResult: (error: String?) -> Unit) {
+    fun login(identifier: String, password: String, onResult: (AuthResult) -> Unit) {
         if (isLoading) return
         isLoading = true
         viewModelScope.launch {
             val result = account.login(identifier, password)
             isLoading = false
-            onResult(result.exceptionOrNull()?.message)
+            onResult(result.fold(onSuccess = { AuthResult.Success }, onFailure = { it.toAuthResult() }))
         }
     }
 
-    /** Daftar ke server, lalu langsung login agar dapat token. */
+    /** Hanya mendaftarkan akun. Tidak login otomatis. */
     fun register(
         username: String,
         fullName: String,
         email: String,
         phone: String,
         password: String,
-        onResult: (error: String?) -> Unit
+        onResult: (AuthResult) -> Unit
     ) {
         if (isLoading) return
         isLoading = true
         viewModelScope.launch {
-            val registered = account.register(username, fullName, email, phone, password)
-            val result = if (registered.isSuccess) {
-                account.login(email, password).map { }
-            } else {
-                registered
-            }
+            val result = account.register(username, fullName, email, phone, password)
             isLoading = false
-            onResult(result.exceptionOrNull()?.message)
+            onResult(result.fold(onSuccess = { AuthResult.Success }, onFailure = { it.toAuthResult() }))
         }
     }
 
@@ -69,7 +74,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
      * Tampilkan pemilih akun Google, lalu kirim ID token ke server.
      * activityContext: LocalContext.current dari layar (harus Activity).
      */
-    fun google(activityContext: Context, mode: GoogleMode, onResult: (GoogleResult) -> Unit) {
+    fun google(activityContext: Context, mode: GoogleMode, onResult: (AuthResult) -> Unit) {
         if (isLoading) return
         isLoading = true
         viewModelScope.launch {
@@ -77,19 +82,12 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             val result = tokenResult.fold(
                 onSuccess = { idToken ->
                     val modeText = if (mode == GoogleMode.REGISTER) "register" else "login"
-                    val auth = account.googleAuth(idToken, modeText)
-                    val error = auth.exceptionOrNull()
-                    when {
-                        error == null -> GoogleResult.Success
-                        error is ApiException && error.code == 404 ->
-                            GoogleResult.NotRegistered(error.message ?: "Akun belum terdaftar")
-                        else -> GoogleResult.Error(error.message ?: "Login Google gagal")
-                    }
+                    account.googleAuth(idToken, modeText).fold(
+                        onSuccess = { AuthResult.Success },
+                        onFailure = { it.toAuthResult() }
+                    )
                 },
-                onFailure = { error ->
-                    if (error is GoogleCancelledException) GoogleResult.Cancelled
-                    else GoogleResult.Error(error.message ?: "Login Google gagal")
-                }
+                onFailure = { it.toAuthResult() }
             )
             isLoading = false
             onResult(result)

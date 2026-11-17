@@ -59,6 +59,7 @@ import com.example.pilahin.ui.menu.HistoryScreen
 import com.example.pilahin.ui.menu.OilScreen
 import com.example.pilahin.ui.menu.ProfileScreen
 import com.example.pilahin.ui.menu.ProfileViewModel
+import com.example.pilahin.ui.menu.TutorialScreen
 import com.example.pilahin.ui.pickup.NotificationsScreen
 import com.example.pilahin.ui.pickup.PickupFormScreen
 import com.example.pilahin.ui.pickup.PickupScreen
@@ -86,6 +87,7 @@ object MainRoutes {
     const val RESULT = "result"
     const val ABOUT = "about"
     const val MAP = "map"
+    const val TUTORIAL = "tutorial"
 }
 
 @Composable
@@ -107,7 +109,7 @@ fun MainShell(
     val activeTab = when (route) {
         MainRoutes.GUIDE, MainRoutes.OIL, MainRoutes.MAP, MainRoutes.NOTIFICATIONS -> MainRoutes.HOME
         MainRoutes.PICKUP_FORM -> MainRoutes.PICKUP
-        MainRoutes.ABOUT, MainRoutes.EDIT_PROFILE -> MainRoutes.PROFILE
+        MainRoutes.ABOUT, MainRoutes.EDIT_PROFILE, MainRoutes.TUTORIAL -> MainRoutes.PROFILE
         else -> route
     }
 
@@ -208,9 +210,13 @@ fun MainShell(
                     onEditProfile = { nav.navigate(MainRoutes.EDIT_PROFILE) },
                     onNotifications = { nav.navigate(MainRoutes.NOTIFICATIONS) },
                     onHistory = { openTab(MainRoutes.HISTORY) },
+                    onTutorial = { nav.navigate(MainRoutes.TUTORIAL) },
                     onAbout = { nav.navigate(MainRoutes.ABOUT) },
                     onLogout = onLogout
                 )
+            }
+            composable(MainRoutes.TUTORIAL) {
+                TutorialScreen(onBack = { nav.popBackStack() })
             }
             composable(MainRoutes.EDIT_PROFILE) {
                 EditProfileScreen(
