@@ -1,8 +1,13 @@
 package com.example.pilahin.ui.dashboard
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.GradientDrawable
 import android.location.Location
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,9 +29,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Directions
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,6 +50,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -70,6 +78,18 @@ private fun distanceMeters(a: LatLng, b: LatLng): Float {
     val result = FloatArray(1)
     Location.distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, result)
     return result[0]
+}
+
+/** Buka petunjuk arah ke bank sampah di Google Maps (atau browser kalau aplikasinya tidak ada). */
+private fun openRoute(context: Context, bank: BankSampah) {
+    val lat = bank.location.latitude
+    val lng = bank.location.longitude
+    val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, "Tidak ada aplikasi peta di HP ini", Toast.LENGTH_SHORT).show()
+    }
 }
 
 private fun formatDistance(meters: Float): String =
@@ -154,6 +174,7 @@ fun FullMapScreen(
                         Marker(map).apply {
                             position = GeoPoint(bank.location.latitude, bank.location.longitude)
                             title = bank.name
+                            snippet = bank.address
                             icon = bankIcon.constantState?.newDrawable()?.mutate() ?: bankIcon
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         }
@@ -230,10 +251,22 @@ fun FullMapScreen(
                     BankCard(
                         bank = bank,
                         distance = formatDistance(distance),
-                        onClick = { flyTo(bank.location, 18.0) }
+                        onClick = { flyTo(bank.location, 18.0) },
+                        onRoute = { openRoute(context, bank) }
                     )
                 }
             }
+        } else {
+            // Sedang mencari, atau tidak ada bank sampah / gagal dimuat
+            BankStatusCard(
+                loading = state.banksLoading,
+                message = state.bankMessage,
+                onRetry = { viewModel.retryBanks() },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+            )
         }
     }
 }
@@ -266,10 +299,15 @@ private fun MapFab(
 }
 
 @Composable
-private fun BankCard(bank: BankSampah, distance: String, onClick: () -> Unit) {
+private fun BankCard(
+    bank: BankSampah,
+    distance: String,
+    onClick: () -> Unit,
+    onRoute: () -> Unit
+) {
     Surface(
         modifier = Modifier
-            .width(230.dp)
+            .width(270.dp)
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
@@ -291,9 +329,87 @@ private fun BankCard(bank: BankSampah, distance: String, onClick: () -> Unit) {
                 Icon(Icons.Rounded.LocationOn, null, tint = GreenPrimary, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(12.dp))
-            Column {
-                Text(bank.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextDark)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    bank.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text("$distance dari Anda", fontSize = 12.sp, color = TextMuted)
+                bank.address?.let {
+                    Text(
+                        it,
+                        fontSize = 11.sp,
+                        color = TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            // Tombol rute: buka petunjuk arah di Google Maps
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(GreenPrimary)
+                    .clickable(onClick = onRoute),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.Directions, "Rute", tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BankStatusCard(
+    loading: Boolean,
+    message: String?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (!loading && message == null) return
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = CardBorderStroke,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (loading) {
+                CircularProgressIndicator(
+                    color = GreenPrimary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text("Mencari bank sampah terdekat…", fontSize = 13.sp, color = TextDark)
+            } else {
+                Text(
+                    message.orEmpty(),
+                    fontSize = 13.sp,
+                    color = TextDark,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Coba lagi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = GreenPrimary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable(onClick = onRetry)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
             }
         }
     }
