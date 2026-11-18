@@ -4,8 +4,9 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pilahin.data.ApiClassifierRepository
+import com.example.pilahin.data.ApiException
 import com.example.pilahin.data.ClassifierRepository
-import com.example.pilahin.data.FakeClassifierRepository
 import com.example.pilahin.data.HistoryRepository
 import com.example.pilahin.data.ScanResult
 import java.io.File
@@ -28,8 +29,8 @@ data class ScanUiState(
 
 class ScanViewModel(private val app: Application) : AndroidViewModel(app) {
 
-    // Nanti ganti dengan implementasi Retrofit ke Flask + YOLOv8
-    private val classifier: ClassifierRepository = FakeClassifierRepository()
+    // Foto dikirim ke server, model AI PILAHIN yang menebak kategorinya
+    private val classifier: ClassifierRepository = ApiClassifierRepository(app)
     private val historyRepo = HistoryRepository(app)
 
     private val _state = MutableStateFlow(ScanUiState())
@@ -75,9 +76,9 @@ class ScanViewModel(private val app: Application) : AndroidViewModel(app) {
             onDone()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            _state.update {
-                it.copy(processing = false, error = "Gagal menganalisis gambar. Coba lagi.")
-            }
+            // Pesan dari server ditampilkan apa adanya (mis. "Tidak ada sampah terdeteksi...")
+            val message = (e as? ApiException)?.message ?: "Gagal menganalisis gambar. Coba lagi."
+            _state.update { it.copy(processing = false, error = message) }
         }
     }
 

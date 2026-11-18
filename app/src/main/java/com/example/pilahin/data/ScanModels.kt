@@ -63,5 +63,9 @@ data class ScanResult(
     val category: WasteCategory,
     val confidence: Float,
     val imagePath: String,
-    val timeMillis: Long
+    val timeMillis: Long,
+    // Dari server AI (boleh kosong untuk data riwayat lama)
+    val reason: String? = null,             // alasan masuk kategori ini
+    val disposal: List<String> = emptyList(), // cara membuang khusus jenis ini
+    val uncertain: Boolean = false          // true = AI kurang yakin
 )

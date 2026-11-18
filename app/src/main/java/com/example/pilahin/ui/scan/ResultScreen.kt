@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.MenuBook
@@ -150,7 +151,7 @@ fun ResultScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CategoryChip(category)
                     Text(
-                        text = "Akurasi ${(item.confidence * 100).toInt()}%",
+                        text = "Keyakinan ${(item.confidence * 100).toInt()}%",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = GreenDark,
@@ -160,6 +161,29 @@ fun ResultScreen(
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
+            }
+        }
+
+        // ===== Peringatan kalau AI kurang yakin =====
+        if (item.uncertain) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFFFFF4E0))
+                    .padding(14.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(Icons.Rounded.Info, null, tint = Color(0xFFE66A00), modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = "AI kurang yakin dengan foto ini. Coba foto ulang dengan cahaya terang, " +
+                            "objek di tengah, dan latar polos.",
+                    fontSize = 13.sp,
+                    color = TextDark,
+                    lineHeight = 18.sp
+                )
             }
         }
 
@@ -258,6 +282,26 @@ fun ResultScreen(
                 color = Color.White
             )
 
+            // Alasan dari AI: kenapa benda ini masuk kategori tersebut
+            item.reason?.let { reason ->
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White.copy(alpha = 0.18f))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "Kenapa masuk ${category.label}?",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(reason, fontSize = 13.sp, color = Color.White, lineHeight = 18.sp)
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
 
             // Panel putih: langkah, contoh, tips
@@ -275,7 +319,9 @@ fun ResultScreen(
                     color = TextDark
                 )
                 Spacer(Modifier.height(8.dp))
-                category.steps.forEachIndexed { index, step ->
+                // Pakai langkah khusus dari server; kalau kosong pakai langkah umum kategori
+                val steps = item.disposal.ifEmpty { category.steps }
+                steps.forEachIndexed { index, step ->
                     Row(
                         modifier = Modifier.padding(vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically

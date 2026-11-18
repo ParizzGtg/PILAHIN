@@ -21,7 +21,12 @@ class HistoryRepository(context: Context) {
                     category = WasteCategory.valueOf(o.getString("category")),
                     confidence = o.getDouble("confidence").toFloat(),
                     imagePath = o.getString("imagePath"),
-                    timeMillis = o.getLong("time")
+                    timeMillis = o.getLong("time"),
+                    reason = o.optString("reason").ifBlank { null },
+                    disposal = o.optJSONArray("disposal")?.let { a ->
+                        (0 until a.length()).map { i -> a.getString(i) }
+                    } ?: emptyList(),
+                    uncertain = o.optBoolean("uncertain", false)
                 )
             }.sortedByDescending { it.timeMillis }
         } catch (e: Exception) {
@@ -40,6 +45,9 @@ class HistoryRepository(context: Context) {
                     .put("confidence", it.confidence.toDouble())
                     .put("imagePath", it.imagePath)
                     .put("time", it.timeMillis)
+                    .put("reason", it.reason ?: "")
+                    .put("disposal", JSONArray(it.disposal))
+                    .put("uncertain", it.uncertain)
             )
         }
         prefs.edit().putString(KEY, arr.toString()).apply()
