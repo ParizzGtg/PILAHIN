@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +49,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.pilahin.data.PickupStatus
 import com.example.pilahin.ui.common.pressScale
 import com.example.pilahin.ui.dashboard.DashboardScreen
 import com.example.pilahin.ui.dashboard.DashboardViewModel
@@ -72,6 +74,7 @@ import com.example.pilahin.ui.theme.Lime
 import com.example.pilahin.ui.theme.SplashBackground
 import com.example.pilahin.ui.theme.TextDark
 import com.example.pilahin.ui.theme.TextMuted
+import java.util.Calendar
 
 object MainRoutes {
     const val HOME = "home"
@@ -102,6 +105,24 @@ fun MainShell(
 
     val profile by profileViewModel.profile.collectAsState()
     val notifications by pickupViewModel.notifications.collectAsState()
+    val requests by pickupViewModel.requests.collectAsState()
+
+    // Request aktif terdekat milik pengguna (null kalau tidak ada)
+    val nextPickup = remember(requests) {
+        val startOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        requests
+            .filter {
+                (it.status == PickupStatus.MENUNGGU || it.status == PickupStatus.DITERIMA) &&
+                        it.dayMillis >= startOfToday
+            }
+            .minByOrNull { it.dayMillis }
+    }
+
     val backEntry by nav.currentBackStackEntryAsState()
     val route = backEntry?.destination?.route
 
@@ -114,6 +135,7 @@ fun MainShell(
     }
 
     fun openTab(target: String) {
+        if (route == target) return // sudah di halaman ini, abaikan (mencegah kamera hitam)
         nav.navigate(target) {
             popUpTo(MainRoutes.HOME)
             launchSingleTop = true
@@ -143,6 +165,7 @@ fun MainShell(
                 DashboardScreen(
                     userName = profile.name,
                     hasUnread = notifications.any { !it.read },
+                    nextPickup = nextPickup,
                     onNotifications = { nav.navigate(MainRoutes.NOTIFICATIONS) },
                     onScan = { openTab(MainRoutes.SCAN) },
                     onSchedule = { openTab(MainRoutes.PICKUP) },
