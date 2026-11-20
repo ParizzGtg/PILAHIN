@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.DocumentScanner
-import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Warning
@@ -75,15 +74,16 @@ private fun WasteCategory.binColor(): Color = when (this) {
     WasteCategory.RESIDU -> Color(0xFF78909C)
 }
 
-private fun WasteCategory.whyItMatters(): String = when (this) {
+/** Alasan umum kategori; dipakai kalau server tidak mengirim alasan. */
+private fun WasteCategory.generalReason(): String = when (this) {
     WasteCategory.ORGANIK ->
-        "Sampah organik yang menumpuk di TPA menghasilkan gas metana. Jika dikomposkan, ia kembali menjadi pupuk bagi tanaman."
+        "Berasal dari makhluk hidup (tumbuhan, hewan, atau sisa makanan), sehingga bisa diurai bakteri dan jamur menjadi tanah atau kompos."
     WasteCategory.ANORGANIK ->
-        "Plastik butuh puluhan hingga ratusan tahun untuk terurai. Jika dipilah dan didaur ulang, ia bisa menjadi bahan baku baru."
+        "Dibuat dari bahan buatan atau tambang seperti plastik, logam, atau kaca. Bahan ini sulit terurai alami, tetapi banyak yang bisa didaur ulang."
     WasteCategory.B3 ->
-        "Zat berbahaya dari baterai atau lampu bisa meresap ke tanah dan air jika dibuang sembarangan."
+        "Mengandung zat kimia berbahaya atau beracun yang bisa mencemari tanah dan air serta membahayakan kesehatan, sehingga butuh penanganan khusus."
     WasteCategory.RESIDU ->
-        "Sampah residu tidak bisa diolah lagi. Mengurangi pemakaiannya dari sumber membantu meringankan beban TPA."
+        "Sudah tercampur atau terkontaminasi, sehingga tidak bisa dikomposkan maupun didaur ulang dan hanya bisa berakhir di tempat pembuangan akhir."
 }
 
 private fun WasteCategory.avoid(): String = when (this) {
@@ -282,24 +282,27 @@ fun ResultScreen(
                 color = Color.White
             )
 
-            // Alasan dari AI: kenapa benda ini masuk kategori tersebut
-            item.reason?.let { reason ->
-                Spacer(Modifier.height(10.dp))
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.18f))
-                        .padding(12.dp)
-                ) {
-                    Text(
-                        text = "Kenapa masuk ${category.label}?",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                    Text(reason, fontSize = 13.sp, color = Color.White, lineHeight = 18.sp)
-                }
+            // Kenapa benda ini masuk kategori tersebut (alasan dari AI, kalau kosong pakai alasan umum)
+            Spacer(Modifier.height(10.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = "Kenapa masuk ${category.label}?",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+                Text(
+                    text = item.reason ?: category.generalReason(),
+                    fontSize = 13.sp,
+                    color = Color.White,
+                    lineHeight = 18.sp
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -369,25 +372,6 @@ fun ResultScreen(
                 Column {
                     Text("Hindari", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFE66A00))
                     Text(category.avoid(), fontSize = 13.sp, color = TextDark, lineHeight = 18.sp)
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            // Kenapa penting
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color.White.copy(alpha = 0.18f))
-                    .padding(14.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(Icons.Rounded.Lightbulb, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text("Kenapa penting?", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                    Text(category.whyItMatters(), fontSize = 13.sp, color = Color.White, lineHeight = 18.sp)
                 }
             }
         }

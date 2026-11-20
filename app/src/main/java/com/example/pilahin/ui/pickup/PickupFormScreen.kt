@@ -18,10 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LocationOff
 import androidx.compose.material.icons.rounded.MyLocation
@@ -51,7 +49,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,11 +92,6 @@ private fun utcToLocalMidnight(utc: Long): Long {
     }.timeInMillis
 }
 
-private fun nowMinutes(): Int {
-    val c = Calendar.getInstance()
-    return c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE)
-}
-
 @Suppress("DEPRECATION")
 private fun reverseGeocode(context: Context, lat: Double, lon: Double): String {
     val fallback = "%.5f, %.5f".format(Locale.US, lat, lon)
@@ -132,12 +124,9 @@ fun PickupFormScreen(
     var detail by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var types by remember { mutableStateOf(setOf<WasteCategory>()) }
-    var hourText by remember { mutableStateOf("") }
-    var minuteText by remember { mutableStateOf("") }
     var showErrors by remember { mutableStateOf(false) }
 
     val todayUtc = remember { todayUtcMillis() }
-    val todayLocal = remember { utcToLocalMidnight(todayUtc) }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = todayUtc,
         selectableDates = remember {
@@ -149,17 +138,6 @@ fun PickupFormScreen(
         }
     )
     val selectedLocal = datePickerState.selectedDateMillis?.let { utcToLocalMidnight(it) }
-
-    val hour = hourText.toIntOrNull()
-    val minute = minuteText.toIntOrNull()
-    val timeError: String? = when {
-        !showErrors -> null
-        hour == null || minute == null -> "Isi jam dan menit"
-        hour !in 0..23 || minute !in 0..59 -> "Jam 0–23 dan menit 0–59"
-        selectedLocal == todayLocal && hour * 60 + minute <= nowMinutes() ->
-            "Pilih jam setelah sekarang"
-        else -> null
-    }
 
     // GPS: izin, aktifkan lokasi, ambil posisi, lalu ubah jadi alamat
     val requestLocation = rememberLocationRequester(
@@ -186,8 +164,6 @@ fun PickupFormScreen(
         val loc = location
         val day = selectedLocal
         if (loc == null || address.isBlank() || day == null || types.isEmpty()) return
-        if (hour == null || minute == null || hour !in 0..23 || minute !in 0..59) return
-        if (day == todayLocal && hour * 60 + minute <= nowMinutes()) return
 
         viewModel.create(
             address = address.trim(),
@@ -195,7 +171,7 @@ fun PickupFormScreen(
             latitude = loc.latitude,
             longitude = loc.longitude,
             dayMillis = day,
-            slot = "%02d.%02d".format(hour, minute),
+            slot = "",
             types = types.toList(),
             note = note.trim()
         )
@@ -357,57 +333,8 @@ fun PickupFormScreen(
 
         Spacer(Modifier.height(14.dp))
 
-        // Jam: input manual
-        Column(modifier = Modifier.reveal(3)) {
-            SectionLabel("Jam penjemputan")
-            Row(verticalAlignment = Alignment.Top) {
-                FormField(
-                    value = hourText,
-                    onValueChange = { hourText = it.filter { c -> c.isDigit() }.take(2) },
-                    label = "Jam (0–23)",
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.weight(1f),
-                    isError = timeError != null
-                )
-                Text(
-                    text = ":",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextDark,
-                    modifier = Modifier
-                        .padding(horizontal = 10.dp)
-                        .padding(top = 14.dp)
-                )
-                FormField(
-                    value = minuteText,
-                    onValueChange = { minuteText = it.filter { c -> c.isDigit() }.take(2) },
-                    label = "Menit (0–59)",
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.weight(1f),
-                    isError = timeError != null
-                )
-            }
-            if (timeError != null) {
-                Text(
-                    text = timeError,
-                    fontSize = 12.sp,
-                    color = Color(0xFFC62828),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            } else {
-                Text(
-                    text = "Contoh: 09 dan 30 untuk pukul 09.30.",
-                    fontSize = 12.sp,
-                    color = TextMuted,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-
         // Jenis sampah
-        Column(modifier = Modifier.reveal(4)) {
+        Column(modifier = Modifier.reveal(3)) {
             SectionLabel("Jenis sampah yang dijemput")
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -434,7 +361,7 @@ fun PickupFormScreen(
 
         Spacer(Modifier.height(14.dp))
 
-        Column(modifier = Modifier.reveal(5)) {
+        Column(modifier = Modifier.reveal(4)) {
             SectionLabel("Catatan untuk petugas (opsional)")
             FormField(
                 value = note,
@@ -445,7 +372,7 @@ fun PickupFormScreen(
         }
 
         Spacer(Modifier.height(14.dp))
-        Box(modifier = Modifier.reveal(6)) {
+        Box(modifier = Modifier.reveal(5)) {
             PrimaryButton(text = "Kirim Request", onClick = { submit() })
         }
         Spacer(Modifier.imePadding().height(24.dp))
@@ -488,21 +415,17 @@ private fun FormField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    modifier: Modifier = Modifier,
     minLines: Int = 1,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    isError: Boolean = false,
     error: String? = null
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        isError = isError || error != null,
+        isError = error != null,
         supportingText = error?.let { { Text(it) } },
         singleLine = minLines == 1,
         minLines = minLines,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = GreenPrimary,
@@ -515,6 +438,6 @@ private fun FormField(
             focusedTextColor = TextDark,
             unfocusedTextColor = TextDark
         ),
-        modifier = modifier.then(if (modifier == Modifier) Modifier.fillMaxWidth() else Modifier)
+        modifier = Modifier.fillMaxWidth()
     )
 }

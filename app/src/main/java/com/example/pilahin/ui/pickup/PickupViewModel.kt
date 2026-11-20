@@ -62,7 +62,7 @@ class PickupViewModel(app: Application) : AndroidViewModel(app) {
         updateRequests(_requests.value + request)
         pushNotification(
             "Request terkirim",
-            "Menunggu konfirmasi petugas untuk ${formatDay(dayMillis)}, pukul $slot."
+            "Menunggu konfirmasi petugas untuk ${formatDay(dayMillis)}."
         )
         scheduleAccept(request.id, ACCEPT_DELAY)
     }
@@ -103,7 +103,7 @@ class PickupViewModel(app: Application) : AndroidViewModel(app) {
             })
             pushNotification(
                 "Request diterima",
-                "Petugas akan menjemput ${formatDay(target.dayMillis)}, pukul ${target.slot}. Siapkan sampahmu."
+                "Petugas akan menjemput ${formatDay(target.dayMillis)}. Siapkan sampahmu."
             )
         }
     }

@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -109,26 +108,17 @@ fun PickupScreen(
     ScreenColumn(title = "Jemput Sampah", onBack = null) {
         // Tombol request: ukuran biasa
         Reveal(0) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Button(
-                    onClick = onNewRequest,
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = TextDark),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                ) {
-                    Icon(Icons.Rounded.LocalShipping, null, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Request Jemput", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Alamat terisi otomatis dari GPS. Tinggal pilih tanggal dan jam.",
-                    fontSize = 12.sp,
-                    color = TextMuted,
-                    textAlign = TextAlign.Center
-                )
+            Button(
+                onClick = onNewRequest,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = TextDark),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Icon(Icons.Rounded.LocalShipping, null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Request Jemput", fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -152,7 +142,7 @@ fun PickupScreen(
             InfoCard(modifier = Modifier.reveal(2)) {
                 Text("Belum ada jadwal penjemputan", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Text(
-                    text = "Tekan \"Request Jemput\", isi alamat, tanggal, dan jam. Jadwalnya akan muncul di sini.",
+                    text = "Tekan \"Request Jemput\", isi alamat dan tanggal. Jadwalnya akan muncul di sini.",
                     fontSize = 12.sp,
                     color = TextMuted
                 )
@@ -216,8 +206,9 @@ fun PickupScreen(
             containerColor = Color.White,
             title = { Text("Batalkan request?", fontWeight = FontWeight.Bold) },
             text = {
+                val jam = if (target.slot.isNotBlank()) ", ${slotLabel(target.slot).lowercase(idLocale)}" else ""
                 Text(
-                    "Request jemput ${formatDay(target.dayMillis)}, ${slotLabel(target.slot).lowercase(idLocale)} akan dibatalkan.",
+                    "Request jemput ${formatDay(target.dayMillis)}$jam akan dibatalkan.",
                     color = TextMuted
                 )
             },
@@ -265,10 +256,13 @@ private fun ScheduleCard(
                     fontWeight = FontWeight.Bold,
                     color = TextDark
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Schedule, null, tint = GreenPrimary, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(slotLabel(request.slot), fontSize = 12.sp, color = TextMuted)
+                // Request lama masih punya jam; request baru tidak
+                if (request.slot.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Schedule, null, tint = GreenPrimary, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(slotLabel(request.slot), fontSize = 12.sp, color = TextMuted)
+                    }
                 }
             }
             if (onDelete != null) {

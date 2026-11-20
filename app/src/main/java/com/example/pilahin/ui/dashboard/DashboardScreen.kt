@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.LocalShipping
 import androidx.compose.material.icons.rounded.LocationOff
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Map
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.pilahin.data.PickupRequest
 import com.example.pilahin.ui.auth.authEntrance
 import com.example.pilahin.ui.common.pressScale
 import com.example.pilahin.ui.theme.BlobGreen
@@ -67,14 +69,19 @@ import com.example.pilahin.ui.theme.Lime
 import com.example.pilahin.ui.theme.SplashBackground
 import com.example.pilahin.ui.theme.TextDark
 import com.example.pilahin.ui.theme.TextMuted
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 private val CardBorder = BorderStroke(1.dp, Color(0xFFE3EDD9))
+private val IdLocale = Locale("id", "ID")
 
 @Composable
 fun DashboardScreen(
     userName: String,
     hasUnread: Boolean,
+    nextPickup: PickupRequest?,
     onNotifications: () -> Unit,
     onScan: () -> Unit,
     onSchedule: () -> Unit,
@@ -124,7 +131,7 @@ fun DashboardScreen(
         Spacer(Modifier.height(12.dp))
 
         PickupCard(
-            state = state.pickup,
+            request = nextPickup,
             onClick = onSchedule,
             modifier = Modifier.authEntrance(started, 160)
         )
@@ -227,6 +234,26 @@ private fun greetingByTime(): String {
         hour in 11..14 -> "Selamat siang,"
         hour in 15..17 -> "Selamat sore,"
         else -> "Selamat malam,"
+    }
+}
+
+private fun midnightOf(millis: Long): Long =
+    Calendar.getInstance().apply {
+        timeInMillis = millis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+private fun pickupDayLabel(millis: Long): String {
+    val diffDays = Math.round(
+        (midnightOf(millis) - midnightOf(System.currentTimeMillis())) / 86_400_000.0
+    ).toInt()
+    return when (diffDays) {
+        0 -> "Hari ini"
+        1 -> "Besok"
+        else -> SimpleDateFormat("EEEE, d MMM yyyy", IdLocale).format(Date(millis))
     }
 }
 
@@ -350,7 +377,7 @@ private fun ScanCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PickupCard(
-    state: PickupSchedule,
+    request: PickupRequest?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -370,14 +397,14 @@ private fun PickupCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Pengangkutan terdekat",
+                    text = "Penjemputan terdekat",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark
                 )
-                if (state.reminderActive) {
+                if (request != null) {
                     Text(
-                        text = "Pengingat aktif",
+                        text = request.status.label,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = GreenDark,
@@ -391,47 +418,85 @@ private fun PickupCard(
 
             Spacer(Modifier.height(12.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Lime),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = state.dayLabel,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GreenDark
-                    )
-                    Text(
-                        text = state.date,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextDark
-                    )
+            if (request == null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(ChipBg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.LocalShipping, null,
+                            tint = GreenPrimary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Belum ada request jemput",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextDark
+                        )
+                        Text(
+                            text = "Ketuk untuk membuat request.",
+                            fontSize = 12.sp,
+                            color = TextMuted
+                        )
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = TextDark)
                 }
+            } else {
+                val dayAbbrev = SimpleDateFormat("EEE", IdLocale)
+                    .format(Date(request.dayMillis)).uppercase(IdLocale)
+                val dayNumber = SimpleDateFormat("d", IdLocale)
+                    .format(Date(request.dayMillis))
 
-                Spacer(Modifier.width(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Lime),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(dayAbbrev, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GreenDark)
+                        Text(dayNumber, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = TextDark)
+                    }
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = state.time,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextDark
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(text = state.detail, fontSize = 12.sp, color = TextMuted)
+                    Spacer(Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = pickupDayLabel(request.dayMillis),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextDark
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                Icons.Rounded.LocationOn, null,
+                                tint = GreenPrimary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = request.address,
+                                fontSize = 12.sp,
+                                color = TextMuted,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Icon(Icons.Rounded.ChevronRight, null, tint = TextDark)
                 }
-
-                Icon(
-                    imageVector = Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = TextDark
-                )
             }
         }
     }
