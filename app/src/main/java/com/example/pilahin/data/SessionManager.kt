@@ -26,18 +26,31 @@ class SessionManager(context: Context) {
     val photoPath: String? get() = prefs.getString("photo", null)
     val phone: String get() = prefs.getString("phone", "") ?: ""
 
-    /** Hanya untuk memilih tampilan. Server tetap wajib memeriksa peran admin. */
-    val isAdmin: Boolean get() = email.trim().equals(ADMIN_EMAIL, ignoreCase = true)
+    val role: String get() = prefs.getString("role", "user") ?: "user"
+
+    /** true kalau sesi ini dibuat dari tombol "Masuk dengan Google". */
+    val loginViaGoogle: Boolean get() = prefs.getBoolean("login_via_google", false)
+
+    /**
+     * Tampilan admin hanya untuk akun Google adminpilahin yang role-nya admin di database.
+     * Ketiga syarat harus terpenuhi. Ini hanya untuk memilih tampilan;
+     * server tetap memeriksa ulang setiap permintaan admin.
+     */
+    val isAdmin: Boolean
+        get() = loginViaGoogle &&
+                role.equals("admin", ignoreCase = true) &&
+                email.trim().equals(ADMIN_EMAIL, ignoreCase = true)
 
     /** Token login dari backend. null = belum login lewat server. */
     val token: String? get() = prefs.getString("token", null)
 
-    /** Dipanggil setelah /api/login berhasil. */
-    fun saveLogin(token: String, user: ApiUser) {
+    /** Dipanggil setelah login berhasil (/api/login atau /api/google). */
+    fun saveLogin(token: String, user: ApiUser, viaGoogle: Boolean) {
         markOnboardingSeen() // yang sudah login pasti sudah melewati onboarding
         prefs.edit()
             .putBoolean("logged_in", true)
             .putString("token", token)
+            .putBoolean("login_via_google", viaGoogle)
             .apply()
         saveUser(user)
     }
@@ -51,6 +64,7 @@ class SessionManager(context: Context) {
             .putString("email", user.email)
             .putString("phone", user.phone)
             .putString("photo", user.photoUrl)
+            .putString("role", user.role)
             .apply()
     }
 

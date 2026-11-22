@@ -10,7 +10,8 @@ data class ApiUser(
     val fullName: String,
     val email: String,
     val phone: String,
-    val photoUrl: String?
+    val photoUrl: String?,
+    val role: String = "user"          // "user" atau "admin" (dari kolom role di database)
 )
 
 /** Error dari server, membawa pesan yang siap ditampilkan ke pengguna. */
@@ -49,7 +50,7 @@ class AccountRepository(context: Context) {
         if (!res.isSuccess) return fail(res)
 
         val user = parseUser(res.body.getJSONObject("user"))
-        session.saveLogin(res.body.getString("token"), user)
+        session.saveLogin(res.body.getString("token"), user, viaGoogle = false)
         return Result.success(user)
     }
 
@@ -88,7 +89,7 @@ class AccountRepository(context: Context) {
 
         val user = parseUser(res.body.getJSONObject("user"))
         if (mode == "login") {
-            session.saveLogin(res.body.getString("token"), user)
+            session.saveLogin(res.body.getString("token"), user, viaGoogle = true)
         }
         return Result.success(user)
     }
@@ -122,6 +123,7 @@ class AccountRepository(context: Context) {
         fullName = o.getString("full_name"),
         email = o.getString("email"),
         phone = if (o.isNull("phone")) "" else o.getString("phone"),
-        photoUrl = if (o.isNull("photo_url")) null else o.getString("photo_url")
+        photoUrl = if (o.isNull("photo_url")) null else o.getString("photo_url"),
+        role = o.optString("role", "user").ifBlank { "user" }
     )
 }

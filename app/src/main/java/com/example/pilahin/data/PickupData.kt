@@ -26,7 +26,8 @@ data class PickupRequest(
     val status: PickupStatus,
     val createdMillis: Long,
     val adminNote: String = "",
-    val requesterName: String = ""
+    val requesterName: String = "",
+    val requesterPhone: String = ""
 )
 
 data class AppNotification(
@@ -63,7 +64,8 @@ fun pickupFromJson(o: JSONObject): PickupRequest {
             .getOrDefault(PickupStatus.MENUNGGU),
         createdMillis = o.optLong("created"),
         adminNote = o.optString("admin_note"),
-        requesterName = o.optString("requester_name")
+        requesterName = o.optString("requester_name"),
+        requesterPhone = o.optString("requester_phone")
     )
 }
 
@@ -81,6 +83,7 @@ fun pickupToJson(r: PickupRequest): JSONObject = JSONObject()
     .put("created", r.createdMillis)
     .put("admin_note", r.adminNote)
     .put("requester_name", r.requesterName)
+    .put("requester_phone", r.requesterPhone)
 
 fun parsePickups(arr: JSONArray?): List<PickupRequest> {
     if (arr == null) return emptyList()

@@ -25,6 +25,10 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /** false sampai percobaan muat pertama selesai (untuk tanda loading). */
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
     init {
         viewModelScope.launch {
             while (true) {
@@ -43,6 +47,12 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             _error.value = res.message
         }
+        _loaded.value = true
+    }
+
+    /** Muat ulang sekarang (tombol "Coba lagi"). */
+    fun refresh() {
+        viewModelScope.launch { load() }
     }
 
     /** onResult(null) = berhasil, onResult("pesan") = gagal */
