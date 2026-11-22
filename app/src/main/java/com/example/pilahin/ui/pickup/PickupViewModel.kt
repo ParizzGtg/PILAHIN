@@ -1,26 +1,32 @@
 package com.example.pilahin.ui.pickup
 
 import android.app.Application
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pilahin.data.ApiClient
 import com.example.pilahin.data.AppNotification
 import com.example.pilahin.data.NotificationRepository
 import com.example.pilahin.data.PickupRepository
 import com.example.pilahin.data.PickupRequest
 import com.example.pilahin.data.PickupStatus
+import com.example.pilahin.data.SessionManager
 import com.example.pilahin.data.WasteCategory
+import com.example.pilahin.data.parsePickups
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
-class PickupViewModel(app: Application) : AndroidViewModel(app) {
+class PickupViewModel(private val app: Application) : AndroidViewModel(app) {
 
-    // Nanti ganti dengan implementasi backend asli
     private val pickupRepo = PickupRepository(app)
     private val notifRepo = NotificationRepository(app)
+    private val session = SessionManager(app)
 
     private val _requests = MutableStateFlow(pickupRepo.getAll())
     val requests: StateFlow<List<PickupRequest>> = _requests.asStateFlow()
@@ -29,13 +35,58 @@ class PickupViewModel(app: Application) : AndroidViewModel(app) {
     val notifications: StateFlow<List<AppNotification>> = _notifications.asStateFlow()
 
     init {
-        // SIMULASI: request yang menunggu akan "diterima" setelah 15 detik
-        val now = System.currentTimeMillis()
-        _requests.value
-            .filter { it.status == PickupStatus.MENUNGGU }
-            .forEach { scheduleAccept(it.id, maxOf(0L, ACCEPT_DELAY - (now - it.createdMillis))) }
+        // Ambil status terbaru dari server secara berkala (admin bisa mengubahnya kapan saja)
+        viewModelScope.launch {
+            while (true) {
+                fetch()
+                delay(POLL_MS)
+            }
+        }
     }
 
+    private fun toast(message: String) =
+        Toast.makeText(app, message, Toast.LENGTH_LONG).show()
+
+    private suspend fun fetch() {
+        val token = session.token ?: return
+        val res = ApiClient.request("GET", "/api/pickups", token = token)
+        if (!res.isSuccess) return
+        val list = parsePickups(res.body.optJSONArray("pickups"))
+        notifyChanges(_requests.value, list)
+        updateRequests(list)
+    }
+
+    /** Buat notifikasi saat admin mengubah status request. */
+    private fun notifyChanges(old: List<PickupRequest>, new: List<PickupRequest>) {
+        val before = old.associateBy { it.id }
+        new.forEach { r ->
+            val prev = before[r.id] ?: return@forEach
+            if (prev.status == r.status && prev.slot == r.slot) return@forEach
+            when (r.status) {
+                PickupStatus.DITERIMA -> {
+                    val jam = if (r.slot.isNotBlank()) ", pukul ${r.slot}" else ""
+                    pushNotification(
+                        "Request disetujui",
+                        "Petugas akan menjemput ${formatDay(r.dayMillis)}$jam. Siapkan sampahmu."
+                    )
+                }
+                PickupStatus.DITOLAK -> {
+                    val alasan = if (r.adminNote.isNotBlank()) " Alasan: ${r.adminNote}" else ""
+                    pushNotification(
+                        "Request ditolak",
+                        "Request jemput ${formatDay(r.dayMillis)} ditolak.$alasan"
+                    )
+                }
+                PickupStatus.SELESAI -> pushNotification(
+                    "Penjemputan selesai",
+                    "Sampahmu pada ${formatDay(r.dayMillis)} sudah dijemput. Terima kasih!"
+                )
+                else -> Unit
+            }
+        }
+    }
+
+    /** Parameter slot diabaikan: jam penjemputan ditentukan admin. */
     fun create(
         address: String,
         detail: String,
@@ -46,38 +97,52 @@ class PickupViewModel(app: Application) : AndroidViewModel(app) {
         types: List<WasteCategory>,
         note: String
     ) {
-        val request = PickupRequest(
-            id = UUID.randomUUID().toString(),
-            address = address,
-            detail = detail,
-            latitude = latitude,
-            longitude = longitude,
-            dayMillis = dayMillis,
-            slot = slot,
-            types = types,
-            note = note,
-            status = PickupStatus.MENUNGGU,
-            createdMillis = System.currentTimeMillis()
-        )
-        updateRequests(_requests.value + request)
-        pushNotification(
-            "Request terkirim",
-            "Menunggu konfirmasi petugas untuk ${formatDay(dayMillis)}."
-        )
-        scheduleAccept(request.id, ACCEPT_DELAY)
+        viewModelScope.launch {
+            val token = session.token
+            if (token == null) {
+                toast("Sesi tidak valid, silakan login ulang")
+                return@launch
+            }
+            val body = JSONObject()
+                .put("address", address)
+                .put("detail", detail)
+                .put("latitude", latitude)
+                .put("longitude", longitude)
+                .put("day", dayMillis)
+                .put("types", JSONArray(types.map { it.name }))
+                .put("note", note)
+            val res = ApiClient.request("POST", "/api/pickups", body, token)
+            if (res.isSuccess) {
+                pushNotification(
+                    "Request terkirim",
+                    "Menunggu konfirmasi admin untuk ${formatDay(dayMillis)}."
+                )
+                fetch()
+            } else {
+                toast(res.message)
+            }
+        }
     }
 
     fun cancel(id: String) {
-        val target = _requests.value.firstOrNull { it.id == id } ?: return
-        if (target.status != PickupStatus.MENUNGGU && target.status != PickupStatus.DITERIMA) return
-        updateRequests(_requests.value.map {
-            if (it.id == id) it.copy(status = PickupStatus.DIBATALKAN) else it
-        })
-        pushNotification("Request dibatalkan", "Request jemput ${formatDay(target.dayMillis)} telah dibatalkan.")
+        viewModelScope.launch {
+            val token = session.token ?: return@launch
+            val res = ApiClient.request("POST", "/api/pickups/$id/cancel", token = token)
+            if (res.isSuccess) {
+                pushNotification("Request dibatalkan", "Request jemput kamu telah dibatalkan.")
+                fetch()
+            } else {
+                toast(res.message)
+            }
+        }
     }
 
     fun delete(id: String) {
-        updateRequests(_requests.value.filter { it.id != id })
+        viewModelScope.launch {
+            val token = session.token ?: return@launch
+            val res = ApiClient.request("DELETE", "/api/pickups/$id", token = token)
+            if (res.isSuccess) fetch() else toast(res.message)
+        }
     }
 
     fun markAllRead() {
@@ -91,21 +156,6 @@ class PickupViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearNotifications() {
         updateNotifications(emptyList())
-    }
-
-    private fun scheduleAccept(id: String, delayMs: Long) {
-        viewModelScope.launch {
-            delay(delayMs)
-            val target = _requests.value.firstOrNull { it.id == id } ?: return@launch
-            if (target.status != PickupStatus.MENUNGGU) return@launch
-            updateRequests(_requests.value.map {
-                if (it.id == id) it.copy(status = PickupStatus.DITERIMA) else it
-            })
-            pushNotification(
-                "Request diterima",
-                "Petugas akan menjemput ${formatDay(target.dayMillis)}. Siapkan sampahmu."
-            )
-        }
     }
 
     private fun updateRequests(list: List<PickupRequest>) {
@@ -130,6 +180,6 @@ class PickupViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
-        const val ACCEPT_DELAY = 15_000L
+        const val POLL_MS = 10_000L
     }
 }

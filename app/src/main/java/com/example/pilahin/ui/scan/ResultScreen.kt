@@ -123,7 +123,7 @@ fun ResultScreen(
 
     ScreenColumn(title = "Hasil Klasifikasi", onBack = onBack) {
 
-        // ===== Ringkas: thumbnail + nama (supaya edukasi langsung terlihat) =====
+        // ===== Ringkas: thumbnail + nama =====
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -376,8 +376,16 @@ fun ResultScreen(
             }
         }
 
+        // ===== Perkiraan nilai jual =====
+        Spacer(Modifier.height(12.dp))
+        PriceCard(
+            name = item.name,
+            category = category,
+            modifier = Modifier.reveal(2)
+        )
+
         Spacer(Modifier.height(10.dp))
-        Reveal(2) {
+        Reveal(3) {
             Text(
                 text = "Hasil ini berupa perkiraan AI. Jika ragu, periksa kembali lewat Panduan Pemilahan.",
                 fontSize = 11.sp,
@@ -388,14 +396,14 @@ fun ResultScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        Reveal(3) {
+        Reveal(4) {
             PrimaryButton(
                 text = if (state.saved) "Tersimpan di Riwayat ✓" else "Simpan ke Riwayat",
                 onClick = { viewModel.saveCurrent() }
             )
         }
         Spacer(Modifier.height(10.dp))
-        Reveal(4) {
+        Reveal(5) {
             OutlinedButton(
                 onClick = onGuide,
                 shape = RoundedCornerShape(50),
@@ -414,7 +422,7 @@ fun ResultScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
-        Reveal(5) {
+        Reveal(6) {
             OutlinedButton(
                 onClick = onRescan,
                 shape = RoundedCornerShape(50),

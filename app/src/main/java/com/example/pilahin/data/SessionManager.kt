@@ -26,6 +26,9 @@ class SessionManager(context: Context) {
     val photoPath: String? get() = prefs.getString("photo", null)
     val phone: String get() = prefs.getString("phone", "") ?: ""
 
+    /** Hanya untuk memilih tampilan. Server tetap wajib memeriksa peran admin. */
+    val isAdmin: Boolean get() = email.trim().equals(ADMIN_EMAIL, ignoreCase = true)
+
     /** Token login dari backend. null = belum login lewat server. */
     val token: String? get() = prefs.getString("token", null)
 
@@ -79,5 +82,9 @@ class SessionManager(context: Context) {
     fun logout() {
         markOnboardingSeen() // jaga-jaga untuk sesi yang dibuat sebelum update
         prefs.edit().clear().apply()
+    }
+
+    companion object {
+        const val ADMIN_EMAIL = "adminpilahin@gmail.com"
     }
 }

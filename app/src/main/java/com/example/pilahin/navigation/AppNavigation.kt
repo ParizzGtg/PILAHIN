@@ -22,6 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.pilahin.data.SessionManager
+import com.example.pilahin.ui.admin.AdminScreen
 import com.example.pilahin.ui.auth.AuthResult
 import com.example.pilahin.ui.auth.AuthViewModel
 import com.example.pilahin.ui.auth.GoogleMode
@@ -41,6 +42,7 @@ object Routes {
     const val LOGIN = "login"
     const val REGISTER = "register"
     const val HOME = "home"
+    const val ADMIN = "admin"
 }
 
 @Composable
@@ -56,6 +58,11 @@ fun AppNavigation() {
         navController.navigate(route) {
             popUpTo(from) { inclusive = true }
         }
+    }
+
+    /** Masuk ke tampilan sesuai peran: admin atau pengguna biasa. */
+    fun enter(from: String) {
+        goTo(if (session.isAdmin) Routes.ADMIN else Routes.HOME, from)
     }
 
     /** Popup setelah daftar berhasil: wajib ke halaman login. */
@@ -109,7 +116,7 @@ fun AppNavigation() {
             when (result) {
                 AuthResult.Success ->
                     if (mode == GoogleMode.REGISTER) showRegistered()
-                    else goTo(Routes.HOME, from)
+                    else enter(from)
                 AuthResult.Cancelled -> Unit // pengguna menutup pemilih akun
                 else -> showFailure(result, from)
             }
@@ -142,7 +149,7 @@ fun AppNavigation() {
                     onSplashFinished = {
                         if (session.isLoggedIn) session.markOnboardingSeen()
                         when {
-                            session.isLoggedIn -> goTo(Routes.HOME, Routes.SPLASH)
+                            session.isLoggedIn -> enter(Routes.SPLASH)
                             session.onboardingSeen -> goTo(Routes.LOGIN, Routes.SPLASH)
                             else -> goTo(Routes.ONBOARDING, Routes.SPLASH)
                         }
@@ -171,7 +178,7 @@ fun AppNavigation() {
                 LoginScreen(
                     onLogin = { identifier, password ->
                         authViewModel.login(identifier, password) { result ->
-                            if (result == AuthResult.Success) goTo(Routes.HOME, Routes.LOGIN)
+                            if (result == AuthResult.Success) enter(Routes.LOGIN)
                             else showFailure(result, Routes.LOGIN)
                         }
                     },
@@ -205,6 +212,10 @@ fun AppNavigation() {
 
             composable(Routes.HOME) {
                 MainShell(onLogout = { logout() })
+            }
+
+            composable(Routes.ADMIN) {
+                AdminScreen(onLogout = { logout() })
             }
         }
 
