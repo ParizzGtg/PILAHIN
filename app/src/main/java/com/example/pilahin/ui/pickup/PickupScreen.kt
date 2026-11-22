@@ -83,8 +83,9 @@ private fun isActive(r: PickupRequest) =
 private fun statusColors(status: PickupStatus): Pair<Color, Color> = when (status) {
     PickupStatus.MENUNGGU -> Color(0xFFE66A00) to Color(0xFFFFEBD6)
     PickupStatus.DITERIMA -> Color(0xFF2E7D32) to Color(0xFFE4F1D4)
+    PickupStatus.DITOLAK -> Color(0xFFC62828) to Color(0xFFFFEDEA)
     PickupStatus.SELESAI -> Color(0xFF1E7FD1) to Color(0xFFE1EFFB)
-    PickupStatus.DIBATALKAN -> Color(0xFFC62828) to Color(0xFFFFEDEA)
+    PickupStatus.DIBATALKAN -> Color(0xFF616161) to Color(0xFFEEEEEE)
 }
 
 @Composable
@@ -106,7 +107,6 @@ fun PickupScreen(
     val reminderOptions = listOf("1 hari sebelumnya", "1 jam sebelumnya", "30 menit sebelumnya")
 
     ScreenColumn(title = "Jemput Sampah", onBack = null) {
-        // Tombol request: ukuran biasa
         Reveal(0) {
             Button(
                 onClick = onNewRequest,
@@ -206,9 +206,8 @@ fun PickupScreen(
             containerColor = Color.White,
             title = { Text("Batalkan request?", fontWeight = FontWeight.Bold) },
             text = {
-                val jam = if (target.slot.isNotBlank()) ", ${slotLabel(target.slot).lowercase(idLocale)}" else ""
                 Text(
-                    "Request jemput ${formatDay(target.dayMillis)}$jam akan dibatalkan.",
+                    "Request jemput ${formatDay(target.dayMillis)} akan dibatalkan.",
                     color = TextMuted
                 )
             },
@@ -256,13 +255,20 @@ private fun ScheduleCard(
                     fontWeight = FontWeight.Bold,
                     color = TextDark
                 )
-                // Request lama masih punya jam; request baru tidak
+                // Jam ditetapkan admin saat menyetujui
                 if (request.slot.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Schedule, null, tint = GreenPrimary, modifier = Modifier.size(15.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(slotLabel(request.slot), fontSize = 12.sp, color = TextMuted)
+                        Text(
+                            text = "Dijemput ${slotLabel(request.slot).lowercase(idLocale)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GreenDark
+                        )
                     }
+                } else if (request.status == PickupStatus.MENUNGGU) {
+                    Text("Jam ditentukan admin setelah disetujui", fontSize = 11.sp, color = TextMuted)
                 }
             }
             if (onDelete != null) {
@@ -313,6 +319,16 @@ private fun ScheduleCard(
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             )
             request.types.forEach { CategoryChip(it) }
+        }
+
+        if (request.adminNote.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Catatan admin: ${request.adminNote}",
+                fontSize = 12.sp,
+                color = TextMuted,
+                lineHeight = 17.sp
+            )
         }
 
         if (onCancel != null) {

@@ -6,7 +6,8 @@ import org.json.JSONObject
 
 enum class PickupStatus(val label: String) {
     MENUNGGU("Menunggu konfirmasi"),
-    DITERIMA("Diterima petugas"),
+    DITERIMA("Disetujui"),
+    DITOLAK("Ditolak"),
     SELESAI("Selesai"),
     DIBATALKAN("Dibatalkan")
 }
@@ -18,11 +19,14 @@ data class PickupRequest(
     val latitude: Double,
     val longitude: Double,
     val dayMillis: Long,
+    /** Jam penjemputan yang ditetapkan admin, misalnya "09.30". Kosong = belum ditetapkan. */
     val slot: String,
     val types: List<WasteCategory>,
     val note: String,
     val status: PickupStatus,
-    val createdMillis: Long
+    val createdMillis: Long,
+    val adminNote: String = "",
+    val requesterName: String = ""
 )
 
 data class AppNotification(
@@ -33,7 +37,59 @@ data class AppNotification(
     val read: Boolean
 )
 
-/** Nanti diganti implementasi backend (Retrofit). */
+/* ---------- JSON <-> PickupRequest (dipakai server dan cache lokal) ---------- */
+
+fun pickupFromJson(o: JSONObject): PickupRequest {
+    val arr = o.optJSONArray("types")
+    val raw = if (arr != null) {
+        (0 until arr.length()).map { arr.optString(it) }
+    } else {
+        o.optString("types").split(",")
+    }
+    val types = raw.mapNotNull { s ->
+        runCatching { WasteCategory.valueOf(s.trim().uppercase()) }.getOrNull()
+    }
+    return PickupRequest(
+        id = o.opt("id")?.toString() ?: "",
+        address = o.optString("address"),
+        detail = o.optString("detail"),
+        latitude = o.optDouble("latitude", o.optDouble("lat", 0.0)),
+        longitude = o.optDouble("longitude", o.optDouble("lon", 0.0)),
+        dayMillis = o.optLong("day"),
+        slot = o.optString("pickup_time").ifBlank { o.optString("slot") },
+        types = types,
+        note = o.optString("note"),
+        status = runCatching { PickupStatus.valueOf(o.optString("status").uppercase()) }
+            .getOrDefault(PickupStatus.MENUNGGU),
+        createdMillis = o.optLong("created"),
+        adminNote = o.optString("admin_note"),
+        requesterName = o.optString("requester_name")
+    )
+}
+
+fun pickupToJson(r: PickupRequest): JSONObject = JSONObject()
+    .put("id", r.id)
+    .put("address", r.address)
+    .put("detail", r.detail)
+    .put("latitude", r.latitude)
+    .put("longitude", r.longitude)
+    .put("day", r.dayMillis)
+    .put("pickup_time", r.slot)
+    .put("types", JSONArray(r.types.map { it.name }))
+    .put("note", r.note)
+    .put("status", r.status.name)
+    .put("created", r.createdMillis)
+    .put("admin_note", r.adminNote)
+    .put("requester_name", r.requesterName)
+
+fun parsePickups(arr: JSONArray?): List<PickupRequest> {
+    if (arr == null) return emptyList()
+    return (0 until arr.length()).mapNotNull { i ->
+        runCatching { pickupFromJson(arr.getJSONObject(i)) }.getOrNull()
+    }
+}
+
+/** Cache lokal. Sumber data utama sekarang dari server. */
 class PickupRepository(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences("pilahin_pickup", Context.MODE_PRIVATE)
@@ -41,26 +97,7 @@ class PickupRepository(context: Context) {
     fun getAll(): List<PickupRequest> {
         val raw = prefs.getString(KEY, null) ?: return emptyList()
         return try {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).map {
-                val o = arr.getJSONObject(it)
-                PickupRequest(
-                    id = o.getString("id"),
-                    address = o.getString("address"),
-                    detail = o.optString("detail"),
-                    latitude = o.getDouble("lat"),
-                    longitude = o.getDouble("lon"),
-                    dayMillis = o.getLong("day"),
-                    slot = o.getString("slot"),
-                    types = o.optString("types").split(",")
-                        .filter { s -> s.isNotBlank() }
-                        .mapNotNull { s -> runCatching { WasteCategory.valueOf(s) }.getOrNull() },
-                    note = o.optString("note"),
-                    status = runCatching { PickupStatus.valueOf(o.getString("status")) }
-                        .getOrDefault(PickupStatus.MENUNGGU),
-                    createdMillis = o.getLong("created")
-                )
-            }
+            parsePickups(JSONArray(raw))
         } catch (e: Exception) {
             emptyList()
         }
@@ -68,22 +105,7 @@ class PickupRepository(context: Context) {
 
     fun saveAll(list: List<PickupRequest>) {
         val arr = JSONArray()
-        list.forEach {
-            arr.put(
-                JSONObject()
-                    .put("id", it.id)
-                    .put("address", it.address)
-                    .put("detail", it.detail)
-                    .put("lat", it.latitude)
-                    .put("lon", it.longitude)
-                    .put("day", it.dayMillis)
-                    .put("slot", it.slot)
-                    .put("types", it.types.joinToString(",") { t -> t.name })
-                    .put("note", it.note)
-                    .put("status", it.status.name)
-                    .put("created", it.createdMillis)
-            )
-        }
+        list.forEach { arr.put(pickupToJson(it)) }
         prefs.edit().putString(KEY, arr.toString()).apply()
     }
 
