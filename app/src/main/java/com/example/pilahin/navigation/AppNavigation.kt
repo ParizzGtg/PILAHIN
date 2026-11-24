@@ -22,7 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.pilahin.data.SessionManager
-import com.example.pilahin.ui.admin.AdminHomeScreen
+import com.example.pilahin.ui.admin.AdminScreen
 import com.example.pilahin.ui.auth.AuthResult
 import com.example.pilahin.ui.auth.AuthViewModel
 import com.example.pilahin.ui.auth.GoogleMode
@@ -215,7 +215,7 @@ fun AppNavigation() {
             }
 
             composable(Routes.ADMIN) {
-                AdminHomeScreen(onLogout = { logout() })
+                AdminScreen(onLogout = { logout() })
             }
         }
 
