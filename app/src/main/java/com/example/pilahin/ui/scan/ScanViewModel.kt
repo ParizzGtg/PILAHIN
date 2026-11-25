@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.pilahin.data.ApiClassifierRepository
 import com.example.pilahin.data.ApiException
 import com.example.pilahin.data.ClassifierRepository
+import com.example.pilahin.data.DetectionFrame
+import com.example.pilahin.data.DetectionRepository
 import com.example.pilahin.data.HistoryRepository
 import com.example.pilahin.data.ScanResult
 import java.io.File
@@ -31,10 +33,19 @@ class ScanViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Foto dikirim ke server, model AI PILAHIN yang menebak kategorinya
     private val classifier: ClassifierRepository = ApiClassifierRepository(app)
+    private val detector = DetectionRepository(app)
     private val historyRepo = HistoryRepository(app)
 
     private val _state = MutableStateFlow(ScanUiState())
     val state: StateFlow<ScanUiState> = _state.asStateFlow()
+
+    /** Hasil deteksi langsung dari kamera (kotak + label). */
+    private val _frame = MutableStateFlow<DetectionFrame?>(null)
+    val frame: StateFlow<DetectionFrame?> = _frame.asStateFlow()
+
+    @Volatile private var detecting = false
+    @Volatile private var failures = 0
+    @Volatile private var lastSent = 0L
 
     init {
         viewModelScope.launch {
@@ -43,8 +54,41 @@ class ScanViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /* ---------- Deteksi langsung ---------- */
+
+    /** Dipanggil saat layar scan dibuka: coba lagi walau sebelumnya gagal. */
+    fun resetDetection() {
+        failures = 0
+        _frame.value = null
+    }
+
+    /** Murah dicek dari thread kamera supaya frame tidak diproses sia-sia. */
+    fun wantsFrame(): Boolean =
+        !detecting && failures < MAX_FAILURES && !_state.value.processing &&
+                System.currentTimeMillis() - lastSent >= FRAME_INTERVAL_MS
+
+    fun onFrame(jpeg: ByteArray, width: Int, height: Int) {
+        if (!wantsFrame()) return
+        detecting = true
+        lastSent = System.currentTimeMillis()
+        viewModelScope.launch {
+            val result = detector.detect(jpeg, width, height)
+            result.onSuccess {
+                failures = 0
+                _frame.value = DetectionFrame(it, width, height)
+            }.onFailure {
+                failures++
+                _frame.value = null
+            }
+            detecting = false
+        }
+    }
+
+    /* ---------- Klasifikasi saat foto diambil ---------- */
+
     fun classify(file: File, onDone: () -> Unit) {
         viewModelScope.launch {
+            _frame.value = null
             _state.update { it.copy(processing = true) }
             runClassify(file, onDone)
         }
@@ -52,6 +96,7 @@ class ScanViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun classifyUri(uri: Uri, onDone: () -> Unit) {
         viewModelScope.launch {
+            _frame.value = null
             _state.update { it.copy(processing = true) }
             try {
                 val file = withContext(Dispatchers.IO) {
@@ -105,5 +150,10 @@ class ScanViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun dismissError() {
         _state.update { it.copy(error = null) }
+    }
+
+    private companion object {
+        const val FRAME_INTERVAL_MS = 900L
+        const val MAX_FAILURES = 3
     }
 }

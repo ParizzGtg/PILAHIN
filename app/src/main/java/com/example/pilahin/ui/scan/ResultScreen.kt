@@ -1,11 +1,5 @@
 package com.example.pilahin.ui.scan
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,11 +16,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.Dangerous
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DocumentScanner
+import androidx.compose.material.icons.rounded.Eco
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Recycling
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.ButtonDefaults
@@ -42,7 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,7 +61,7 @@ import java.io.File
 private fun WasteCategory.binName(): String = when (this) {
     WasteCategory.ORGANIK -> "HIJAU"
     WasteCategory.ANORGANIK -> "KUNING"
-    WasteCategory.B3 -> "MERAH KHUSUS"
+    WasteCategory.B3 -> "MERAH"
     WasteCategory.RESIDU -> "ABU-ABU"
 }
 
@@ -73,6 +70,13 @@ private fun WasteCategory.binColor(): Color = when (this) {
     WasteCategory.ANORGANIK -> Color(0xFFFBC02D)
     WasteCategory.B3 -> Color(0xFFE53935)
     WasteCategory.RESIDU -> Color(0xFF78909C)
+}
+
+private fun WasteCategory.icon(): ImageVector = when (this) {
+    WasteCategory.ORGANIK -> Icons.Rounded.Eco
+    WasteCategory.ANORGANIK -> Icons.Rounded.Recycling
+    WasteCategory.B3 -> Icons.Rounded.Dangerous
+    WasteCategory.RESIDU -> Icons.Rounded.DeleteOutline
 }
 
 /** Alasan umum kategori; dipakai kalau server tidak mengirim alasan. */
@@ -110,17 +114,6 @@ fun ResultScreen(
     val category = item.category
     val accent = category.color()
     val heroShape = RoundedCornerShape(28.dp)
-
-    // Denyut pelan pada ikon tong agar mata langsung tertuju ke edukasi
-    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
-        initialValue = 1f,
-        targetValue = 1.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
 
     ScreenColumn(title = "Hasil Klasifikasi", onBack = onBack) {
 
@@ -190,7 +183,7 @@ fun ResultScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ===== KARTU EDUKASI UTAMA: warna solid penuh =====
+        // ===== KARTU EDUKASI UTAMA =====
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -231,93 +224,92 @@ fun ResultScreen(
                 )
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // Pesan terbesar: buang ke mana
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
+            // === HASIL UTAMA: jenis sampah, ukuran terbesar ===
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Color.White)
+                    .padding(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(accent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(category.icon(), null, tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "INI ADALAH SAMPAH",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                            color = TextMuted
+                        )
+                        Text(
+                            text = category.label.uppercase(),
+                            fontSize = 32.sp,
+                            lineHeight = 36.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = accent
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = category.description,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = TextDark
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                // Tong yang dipakai, dijelaskan dengan warna
+                Row(
                     modifier = Modifier
-                        .size(76.dp)
-                        .graphicsLayer {
-                            scaleX = pulse
-                            scaleY = pulse
-                        }
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFFF3F6F0))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(category.binColor()),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Rounded.Delete, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Rounded.Delete, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Masukkan ke tong berwarna ${category.binName()}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextDark
+                        )
+                        Text(
+                            text = "Warna tong membantu memisahkan jenis sampah.",
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
                     }
                 }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(
-                        text = "Buang ke wadah",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                    Text(
-                        text = category.binName(),
-                        fontSize = 28.sp,
-                        lineHeight = 32.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            // Label kategori: di-highlight supaya jadi hasil utama
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.White)
-                    .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(accent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Rounded.Category, null,
-                        tint = Color.White,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = "SAMPAH ${category.label.uppercase()}",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.8.sp,
-                    color = accent
-                )
             }
 
             Spacer(Modifier.height(10.dp))
-            Text(
-                text = category.description,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White
-            )
 
             // Kenapa benda ini masuk kategori tersebut (alasan dari AI, kalau kosong pakai alasan umum)
-            Spacer(Modifier.height(10.dp))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

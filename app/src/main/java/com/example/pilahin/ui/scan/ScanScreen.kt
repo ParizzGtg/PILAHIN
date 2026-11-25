@@ -3,6 +3,8 @@ package com.example.pilahin.ui.scan
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
@@ -11,8 +13,10 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -77,7 +81,29 @@ import com.example.pilahin.ui.theme.Lime
 import com.example.pilahin.ui.theme.SplashBackground
 import com.example.pilahin.ui.theme.TextDark
 import com.example.pilahin.ui.theme.TextMuted
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.Executors
+
+private class FrameJpeg(val bytes: ByteArray, val width: Int, val height: Int)
+
+/** Ubah frame kamera jadi JPEG kecil yang sudah tegak, siap dikirim ke server. */
+private fun frameToJpeg(proxy: ImageProxy, maxSide: Int = 480): FrameJpeg {
+    val src = proxy.toBitmap()
+    val longest = maxOf(src.width, src.height)
+    val scale = if (longest > maxSide) maxSide.toFloat() / longest else 1f
+    val matrix = Matrix().apply {
+        postScale(scale, scale)
+        postRotate(proxy.imageInfo.rotationDegrees.toFloat())
+    }
+    val ready = Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+    val out = ByteArrayOutputStream()
+    ready.compress(Bitmap.CompressFormat.JPEG, 70, out)
+    val result = FrameJpeg(out.toByteArray(), ready.width, ready.height)
+    if (ready !== src) ready.recycle()
+    src.recycle()
+    return result
+}
 
 @Composable
 fun ScanScreen(
@@ -85,6 +111,7 @@ fun ScanScreen(
     onResult: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    val frame by viewModel.frame.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = remember(context) { context.findActivity() as? LifecycleOwner }
 
@@ -103,6 +130,7 @@ fun ScanScreen(
     }
 
     LaunchedEffect(Unit) {
+        viewModel.resetDetection()
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
@@ -123,8 +151,35 @@ fun ScanScreen(
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             .build()
     }
+    val imageAnalysis = remember {
+        ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .build()
+    }
     var camera by remember { mutableStateOf<Camera?>(null) }
     var torchOn by remember { mutableStateOf(false) }
+
+    // Analisis frame untuk deteksi langsung (dibatasi ~1 frame per detik)
+    DisposableEffect(Unit) {
+        val executor = Executors.newSingleThreadExecutor()
+        imageAnalysis.setAnalyzer(executor) { proxy ->
+            try {
+                if (viewModel.wantsFrame()) {
+                    val f = frameToJpeg(proxy)
+                    viewModel.onFrame(f.bytes, f.width, f.height)
+                }
+            } catch (_: Exception) {
+                // frame yang gagal dilewati saja
+            } finally {
+                proxy.close()
+            }
+        }
+        onDispose {
+            imageAnalysis.clearAnalyzer()
+            executor.shutdown()
+        }
+    }
 
     // Pasang kamera ke lifecycle selama layar ini tampil
     DisposableEffect(hasPermission, lifecycleOwner) {
@@ -141,7 +196,8 @@ fun ScanScreen(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
-                    imageCapture
+                    imageCapture,
+                    imageAnalysis
                 )
             }, ContextCompat.getMainExecutor(context))
         }
@@ -188,6 +244,7 @@ fun ScanScreen(
     }
 
     val hasFlash = camera?.cameraInfo?.hasFlashUnit() == true
+    val detectedCount = frame?.items?.size ?: 0
 
     Box(
         modifier = Modifier
@@ -238,16 +295,21 @@ fun ScanScreen(
                 if (hasPermission) {
                     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
                     ScanFrame(Modifier.fillMaxSize().padding(36.dp))
+                    DetectionOverlay(frame = frame, modifier = Modifier.fillMaxSize())
                     Text(
-                        text = "Pastikan objek terlihat jelas",
+                        text = if (detectedCount > 0) "Terdeteksi $detectedCount objek — siap jepret"
+                        else "Arahkan kamera ke sampah",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = TextDark,
+                        color = if (detectedCount > 0) Color.White else TextDark,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 14.dp)
                             .clip(RoundedCornerShape(50))
-                            .background(Color.White.copy(alpha = 0.92f))
+                            .background(
+                                if (detectedCount > 0) GreenDark.copy(alpha = 0.92f)
+                                else Color.White.copy(alpha = 0.92f)
+                            )
                             .padding(horizontal = 14.dp, vertical = 7.dp)
                     )
                 } else {
