@@ -135,6 +135,7 @@ fun AdminScreen(
     val error by viewModel.error.collectAsState()
     val loaded by viewModel.loaded.collectAsState()
 
+    var tab by rememberSaveable { mutableStateOf(0) }
     var filter by rememberSaveable { mutableStateOf<String?>(PickupStatus.MENUNGGU.name) }
     var approveTarget by remember { mutableStateOf<PickupRequest?>(null) }
     var rejectTarget by remember { mutableStateOf<PickupRequest?>(null) }
@@ -174,8 +175,8 @@ fun AdminScreen(
                     HeroStat(
                         value = "${items.count { it.status == status }}",
                         label = label,
-                        selected = filter == status.name,
-                        onClick = { filter = status.name },
+                        selected = tab == 0 && filter == status.name,
+                        onClick = { tab = 0; filter = status.name },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -187,7 +188,7 @@ fun AdminScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(Lime)
-                        .clickable { filter = PickupStatus.DITERIMA.name }
+                        .clickable { tab = 0; filter = PickupStatus.DITERIMA.name }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -201,88 +202,95 @@ fun AdminScreen(
             }
         }
 
+        Spacer(Modifier.height(14.dp))
+        AdminTabSwitch(selected = tab, onSelect = { tab = it }, modifier = Modifier.reveal(1))
         Spacer(Modifier.height(16.dp))
 
-        // ===== Filter status =====
-        Text(
-            "Request jemput", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark,
-            modifier = Modifier.reveal(1)
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).reveal(1),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf(
-                PickupStatus.MENUNGGU to "Menunggu",
-                PickupStatus.DITERIMA to "Disetujui",
-                PickupStatus.SELESAI to "Selesai",
-                PickupStatus.DITOLAK to "Ditolak",
-                PickupStatus.DIBATALKAN to "Dibatalkan"
-            ).forEach { (status, label) ->
-                val (fg, bg) = statusColors(status)
+        if (tab == 1) {
+            AdminPriceSection()
+            Spacer(Modifier.height(20.dp))
+        } else {
+            // ===== Filter status =====
+            Text(
+                "Request jemput", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark,
+                modifier = Modifier.reveal(1)
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()).reveal(1),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    PickupStatus.MENUNGGU to "Menunggu",
+                    PickupStatus.DITERIMA to "Disetujui",
+                    PickupStatus.SELESAI to "Selesai",
+                    PickupStatus.DITOLAK to "Ditolak",
+                    PickupStatus.DIBATALKAN to "Dibatalkan"
+                ).forEach { (status, label) ->
+                    val (fg, bg) = statusColors(status)
+                    AdminFilterChip(
+                        label = label,
+                        count = items.count { it.status == status },
+                        selected = filter == status.name,
+                        fg = fg,
+                        bg = bg,
+                        onClick = { filter = status.name }
+                    )
+                }
                 AdminFilterChip(
-                    label = label,
-                    count = items.count { it.status == status },
-                    selected = filter == status.name,
-                    fg = fg,
-                    bg = bg,
-                    onClick = { filter = status.name }
+                    label = "Semua",
+                    count = items.size,
+                    selected = filter == null,
+                    fg = GreenDark,
+                    bg = Lime,
+                    onClick = { filter = null }
                 )
             }
-            AdminFilterChip(
-                label = "Semua",
-                count = items.size,
-                selected = filter == null,
-                fg = GreenDark,
-                bg = Lime,
-                onClick = { filter = null }
-            )
-        }
 
-        Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(14.dp))
 
-        // ===== Daftar =====
-        when {
-            !loaded -> InfoCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(color = GreenPrimary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text("Memuat request…", fontSize = 13.sp, color = TextDark)
+            // ===== Daftar =====
+            when {
+                !loaded -> InfoCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(color = GreenPrimary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Memuat request…", fontSize = 13.sp, color = TextDark)
+                    }
+                }
+
+                error != null && items.isEmpty() -> AdminEmptyState(
+                    icon = Icons.Rounded.ErrorOutline,
+                    title = "Gagal memuat data",
+                    message = error ?: "",
+                    accent = Danger,
+                    actionLabel = "Coba lagi",
+                    onAction = { viewModel.refresh() }
+                )
+
+                shown.isEmpty() -> AdminEmptyState(
+                    icon = if (filter == PickupStatus.MENUNGGU.name) Icons.Rounded.CheckCircle else Icons.Rounded.LocalShipping,
+                    title = if (filter == PickupStatus.MENUNGGU.name) "Semua request sudah ditangani" else "Belum ada request",
+                    message = "Request baru dari pengguna akan muncul di sini secara otomatis."
+                )
+
+                else -> shown.forEachIndexed { i, request ->
+                    AdminCard(
+                        request = request,
+                        modifier = Modifier.reveal(2 + i.coerceAtMost(6)),
+                        onApprove = { approveTarget = request },
+                        onReject = { rejectTarget = request },
+                        onFinish = {
+                            apply(request.id, PickupStatus.SELESAI, request.slot, request.adminNote, "Ditandai selesai")
+                        },
+                        onMap = { openMap(context, request) },
+                        onCall = if (request.requesterPhone.isNotBlank()) ({ callPhone(context, request.requesterPhone) }) else null
+                    )
+                    Spacer(Modifier.height(12.dp))
                 }
             }
-
-            error != null && items.isEmpty() -> AdminEmptyState(
-                icon = Icons.Rounded.ErrorOutline,
-                title = "Gagal memuat data",
-                message = error ?: "",
-                accent = Danger,
-                actionLabel = "Coba lagi",
-                onAction = { viewModel.refresh() }
-            )
-
-            shown.isEmpty() -> AdminEmptyState(
-                icon = if (filter == PickupStatus.MENUNGGU.name) Icons.Rounded.CheckCircle else Icons.Rounded.LocalShipping,
-                title = if (filter == PickupStatus.MENUNGGU.name) "Semua request sudah ditangani" else "Belum ada request",
-                message = "Request baru dari pengguna akan muncul di sini secara otomatis."
-            )
-
-            else -> shown.forEachIndexed { i, request ->
-                AdminCard(
-                    request = request,
-                    modifier = Modifier.reveal(2 + i.coerceAtMost(6)),
-                    onApprove = { approveTarget = request },
-                    onReject = { rejectTarget = request },
-                    onFinish = {
-                        apply(request.id, PickupStatus.SELESAI, request.slot, request.adminNote, "Ditandai selesai")
-                    },
-                    onMap = { openMap(context, request) },
-                    onCall = if (request.requesterPhone.isNotBlank()) ({ callPhone(context, request.requesterPhone) }) else null
-                )
-                Spacer(Modifier.height(12.dp))
-            }
+            Spacer(Modifier.height(20.dp))
         }
-        Spacer(Modifier.height(20.dp))
     }
 
     approveTarget?.let { target ->
