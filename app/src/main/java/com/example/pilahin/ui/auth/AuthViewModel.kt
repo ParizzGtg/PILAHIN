@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.pilahin.data.AccountRepository
 import com.example.pilahin.data.ApiException
 import com.example.pilahin.data.GoogleCancelledException
+import com.example.pilahin.data.GooglePasswordNeededException
 import com.example.pilahin.data.GoogleSignIn
 import kotlinx.coroutines.launch
 
@@ -20,6 +21,12 @@ sealed class AuthResult {
     object Cancelled : AuthResult()                         // pengguna menutup pemilih akun
     data class NotRegistered(val message: String) : AuthResult()
     data class AlreadyRegistered(val message: String) : AuthResult()
+    /** Daftar Google akun baru: pengguna harus membuat sandi PILAHIN dulu. */
+    data class NeedGooglePassword(
+        val idToken: String,
+        val email: String,
+        val fullName: String
+    ) : AuthResult()
     data class Error(val message: String) : AuthResult()
 }
 
@@ -84,13 +91,28 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                     val modeText = if (mode == GoogleMode.REGISTER) "register" else "login"
                     account.googleAuth(idToken, modeText).fold(
                         onSuccess = { AuthResult.Success },
-                        onFailure = { it.toAuthResult() }
+                        onFailure = {
+                            if (it is GooglePasswordNeededException)
+                                AuthResult.NeedGooglePassword(idToken, it.email, it.fullName)
+                            else it.toAuthResult()
+                        }
                     )
                 },
                 onFailure = { it.toAuthResult() }
             )
             isLoading = false
             onResult(result)
+        }
+    }
+
+    /** Daftar Google akun baru, sekalian dengan sandi PILAHIN yang dibuat pengguna. */
+    fun googleRegisterWithPassword(idToken: String, password: String, onResult: (AuthResult) -> Unit) {
+        if (isLoading) return
+        isLoading = true
+        viewModelScope.launch {
+            val result = account.googleAuth(idToken, "register", password)
+            isLoading = false
+            onResult(result.fold(onSuccess = { AuthResult.Success }, onFailure = { it.toAuthResult() }))
         }
     }
 

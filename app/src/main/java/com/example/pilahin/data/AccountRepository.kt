@@ -18,6 +18,13 @@ data class ApiUser(
 class ApiException(message: String, val code: Int) : Exception(message)
 
 /**
+ * Daftar dengan Google untuk akun BARU: server minta pengguna membuat sandi PILAHIN dulu
+ * (bukan sandi Google). Aplikasi lalu menampilkan dialog sandi dan mengirim ulang.
+ */
+class GooglePasswordNeededException(val email: String, val fullName: String) :
+    Exception("Buat sandi untuk akun PILAHIN kamu")
+
+/**
  * Register, login, update profil, dan hapus akun lewat backend Flask.
  * Token dan data akun disimpan otomatis ke SessionManager.
  */
@@ -78,13 +85,24 @@ class AccountRepository(context: Context) {
     /**
      * Login / daftar dengan Google. mode = "login" atau "register".
      * Kalau mode "login" dan akun belum ada, hasilnya ApiException dengan code 404.
+     * Kalau daftar akun baru tanpa password, hasilnya GooglePasswordNeededException.
+     * password = sandi PILAHIN yang dibuat pengguna (hanya saat daftar akun baru).
      * Sesi hanya dibuat saat login; daftar tidak langsung masuk.
      */
-    suspend fun googleAuth(idToken: String, mode: String): Result<ApiUser> {
+    suspend fun googleAuth(idToken: String, mode: String, password: String? = null): Result<ApiUser> {
         val body = JSONObject()
             .put("id_token", idToken)
             .put("mode", mode)
+        if (password != null) body.put("password", password)
         val res = ApiClient.request("POST", "/api/google", body)
+        if (res.code == 428 && res.body.optBoolean("need_password")) {
+            return Result.failure(
+                GooglePasswordNeededException(
+                    email = res.body.optString("email"),
+                    fullName = res.body.optString("full_name")
+                )
+            )
+        }
         if (!res.isSuccess) return fail(res)
 
         val user = parseUser(res.body.getJSONObject("user"))

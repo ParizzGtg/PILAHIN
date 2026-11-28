@@ -26,6 +26,7 @@ import com.example.pilahin.ui.admin.AdminHomeScreen
 import com.example.pilahin.ui.auth.AuthResult
 import com.example.pilahin.ui.auth.AuthViewModel
 import com.example.pilahin.ui.auth.GoogleMode
+import com.example.pilahin.ui.auth.GooglePasswordDialog
 import com.example.pilahin.ui.auth.LoginScreen
 import com.example.pilahin.ui.auth.RegisterScreen
 import com.example.pilahin.ui.common.AlertData
@@ -53,6 +54,8 @@ fun AppNavigation() {
     val session = remember { SessionManager(context) }
 
     var alert by remember { mutableStateOf<AlertData?>(null) }
+    // Daftar Google akun baru: menunggu pengguna membuat sandi PILAHIN
+    var googlePassword by remember { mutableStateOf<AuthResult.NeedGooglePassword?>(null) }
 
     fun goTo(route: String, from: String) {
         navController.navigate(route) {
@@ -118,6 +121,7 @@ fun AppNavigation() {
                     if (mode == GoogleMode.REGISTER) showRegistered()
                     else enter(from)
                 AuthResult.Cancelled -> Unit // pengguna menutup pemilih akun
+                is AuthResult.NeedGooglePassword -> { googlePassword = result }
                 else -> showFailure(result, from)
             }
         }
@@ -217,6 +221,21 @@ fun AppNavigation() {
             composable(Routes.ADMIN) {
                 AdminHomeScreen(onLogout = { logout() })
             }
+        }
+
+        googlePassword?.let { req ->
+            GooglePasswordDialog(
+                email = req.email,
+                loading = authViewModel.isLoading,
+                onSubmit = { password ->
+                    authViewModel.googleRegisterWithPassword(req.idToken, password) { result ->
+                        googlePassword = null
+                        if (result == AuthResult.Success) showRegistered()
+                        else showFailure(result, Routes.REGISTER)
+                    }
+                },
+                onDismiss = { if (!authViewModel.isLoading) googlePassword = null }
+            )
         }
 
         alert?.let { data ->
